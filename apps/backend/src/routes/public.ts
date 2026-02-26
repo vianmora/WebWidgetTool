@@ -22,7 +22,8 @@ router.get('/:id/reviews', async (req, res) => {
     }
 
     const config = widget.config as any;
-    const reviews = await fetchGoogleReviews(config.placeId, config.apiKey);
+    const apiKey = process.env.GOOGLE_MAPS_API_KEY || config.apiKey;
+    const reviews = await fetchGoogleReviews(config.placeId, apiKey);
 
     const minRating: number = config.minRating ?? 1;
     const maxReviews: number = config.maxReviews ?? 5;

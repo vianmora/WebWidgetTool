@@ -1,11 +1,18 @@
-import { useState, FormEvent } from 'react';
+import { useState, FormEvent, useRef, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import api from '../lib/api';
+
+interface PlacePrediction {
+  place_id: string;
+  description: string;
+  main_text: string;
+  secondary_text: string;
+}
 
 interface FormState {
   name: string;
   placeId: string;
-  apiKey: string;
+  placeName: string;
   maxReviews: number;
   minRating: number;
   theme: string;
@@ -19,25 +26,81 @@ export default function NewWidget() {
   const [form, setForm] = useState<FormState>({
     name: '',
     placeId: '',
-    apiKey: '',
+    placeName: '',
     maxReviews: 5,
     minRating: 4,
     theme: 'light',
     accentColor: '#4F46E5',
   });
 
+  const [search, setSearch] = useState('');
+  const [suggestions, setSuggestions] = useState<PlacePrediction[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
   function update<K extends keyof FormState>(field: K, value: FormState[K]) {
     setForm((f) => ({ ...f, [field]: value }));
   }
 
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setShowDropdown(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  function handleSearchChange(value: string) {
+    setSearch(value);
+    update('placeId', '');
+    update('placeName', '');
+
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+
+    if (value.trim().length < 2) {
+      setSuggestions([]);
+      setShowDropdown(false);
+      return;
+    }
+
+    debounceRef.current = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const { data } = await api.get('/api/places/search', { params: { q: value } });
+        setSuggestions(data);
+        setShowDropdown(data.length > 0);
+      } catch {
+        setSuggestions([]);
+      } finally {
+        setSearching(false);
+      }
+    }, 350);
+  }
+
+  function selectPlace(place: PlacePrediction) {
+    setSearch(place.description);
+    update('placeId', place.place_id);
+    update('placeName', place.main_text);
+    setSuggestions([]);
+    setShowDropdown(false);
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    if (!form.placeId) {
+      setError('Veuillez sélectionner un lieu dans la liste.');
+      return;
+    }
     setError('');
     setLoading(true);
     try {
-      const { name, ...config } = form;
+      const { name, placeName, ...config } = form;
       const { data } = await api.post('/api/widgets', {
-        name,
+        name: name || placeName,
         type: 'google_reviews',
         config,
       });
@@ -72,46 +135,43 @@ export default function NewWidget() {
               onChange={(e) => update('name', e.target.value)}
               placeholder="Ex: Avis Google — Mon Restaurant"
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              required
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Google Place ID</label>
-            <input
-              type="text"
-              value={form.placeId}
-              onChange={(e) => update('placeId', e.target.value)}
-              placeholder="ChIJ…"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
-              required
-            />
-            <p className="text-xs text-gray-400 mt-1">
-              Trouvez votre Place ID sur{' '}
-              <a
-                href="https://developers.google.com/maps/documentation/places/web-service/place-id"
-                target="_blank"
-                rel="noreferrer"
-                className="text-indigo-500 hover:underline"
-              >
-                Google Place Finder
-              </a>
-            </p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Clé API Google Maps</label>
-            <input
-              type="password"
-              value={form.apiKey}
-              onChange={(e) => update('apiKey', e.target.value)}
-              placeholder="AIza…"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
-              required
-            />
-            <p className="text-xs text-gray-400 mt-1">
-              La clé doit avoir l'API <strong>Places</strong> activée.
-            </p>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Lieu Google</label>
+            <div className="relative" ref={dropdownRef}>
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                onFocus={() => suggestions.length > 0 && setShowDropdown(true)}
+                placeholder="Rechercher un établissement…"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                required
+                autoComplete="off"
+              />
+              {searching && (
+                <span className="absolute right-3 top-2.5 text-gray-400 text-xs">Recherche…</span>
+              )}
+              {showDropdown && (
+                <ul className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                  {suggestions.map((place) => (
+                    <li
+                      key={place.place_id}
+                      onMouseDown={() => selectPlace(place)}
+                      className="px-4 py-3 cursor-pointer hover:bg-indigo-50 border-b border-gray-100 last:border-0"
+                    >
+                      <p className="text-sm font-medium text-gray-900">{place.main_text}</p>
+                      <p className="text-xs text-gray-400">{place.secondary_text}</p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            {form.placeId && (
+              <p className="text-xs text-green-600 mt-1">✓ Lieu sélectionné</p>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
