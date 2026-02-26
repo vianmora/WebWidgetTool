@@ -80,6 +80,12 @@ export default function Dashboard() {
                 </div>
               </Link>
             ))}
+            <Link to="/widgets/new" className="h-full">
+              <div className="h-full bg-white rounded-xl border-2 border-dashed border-gray-200 p-5 hover:border-indigo-300 hover:bg-indigo-50 transition-all cursor-pointer flex flex-col items-center justify-center gap-2">
+                <span className="text-3xl text-gray-300 leading-none">+</span>
+                <span className="text-xs text-gray-400 font-medium">Nouveau widget</span>
+              </div>
+            </Link>
           </div>
         )}
       </main>
