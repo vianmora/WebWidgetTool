@@ -312,7 +312,7 @@ export default function WidgetDetail() {
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-200">
-        <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
+        <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link to="/" className="text-gray-400 hover:text-gray-600 text-lg leading-none">←</Link>
             <div>
@@ -334,7 +334,7 @@ export default function WidgetDetail() {
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-4 py-8 space-y-5">
+      <main className="max-w-4xl mx-auto px-4 py-8 space-y-5">
 
         {/* Code à intégrer */}
         <div className="bg-white rounded-xl border border-gray-200 p-6">
