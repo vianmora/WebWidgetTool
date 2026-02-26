@@ -11,7 +11,7 @@ interface Review {
 }
 
 interface PreviewData {
-  widget: { id: string; name: string; config: { theme: string; accentColor: string } };
+  widget: { id: string; name: string; config: { theme: string; accentColor: string; layout: string } };
   reviews: Review[];
 }
 
@@ -72,6 +72,48 @@ function ReviewCard({ review, isDark }: { review: Review; isDark: boolean }) {
   );
 }
 
+function ReviewCardGrid({ review, isDark }: { review: Review; isDark: boolean }) {
+  const bg = isDark ? '#111827' : '#F9FAFB';
+  const border = isDark ? '#374151' : '#E5E7EB';
+  const textColor = isDark ? '#F9FAFB' : '#111827';
+  const subColor = isDark ? '#9CA3AF' : '#6B7280';
+  return (
+    <div style={{ padding: 16, background: bg, borderRadius: 8, border: `1px solid ${border}`, display: 'flex', flexDirection: 'column' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+        {review.profile_photo_url && (
+          <img src={review.profile_photo_url} alt={review.author_name}
+            style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
+            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+        )}
+        <div>
+          <div style={{ fontWeight: 600, fontSize: 13, color: textColor }}>{review.author_name}</div>
+          <StarRating rating={review.rating} />
+        </div>
+      </div>
+      {review.text && <p style={{ color: subColor, margin: 0, fontSize: 13, lineHeight: 1.5, flex: 1 }}>{review.text}</p>}
+      {review.relative_time_description && <div style={{ color: subColor, fontSize: 11, marginTop: 8 }}>{review.relative_time_description}</div>}
+    </div>
+  );
+}
+
+function ReviewCardStars({ review, isDark }: { review: Review; isDark: boolean }) {
+  const border = isDark ? '#374151' : '#E5E7EB';
+  const textColor = isDark ? '#F9FAFB' : '#111827';
+  const subColor = isDark ? '#9CA3AF' : '#6B7280';
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: `1px solid ${border}` }}>
+      {review.profile_photo_url && (
+        <img src={review.profile_photo_url} alt={review.author_name}
+          style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
+          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+      )}
+      <span style={{ fontWeight: 600, fontSize: 14, color: textColor, flex: 1 }}>{review.author_name}</span>
+      <StarRating rating={review.rating} />
+      {review.relative_time_description && <span style={{ fontSize: 12, color: subColor, whiteSpace: 'nowrap' }}>{review.relative_time_description}</span>}
+    </div>
+  );
+}
+
 function WidgetPreview({ widgetId, apiUrl, refreshKey }: { widgetId: string; apiUrl: string; refreshKey: number }) {
   const [data, setData] = useState<PreviewData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -94,20 +136,32 @@ function WidgetPreview({ widgetId, apiUrl, refreshKey }: { widgetId: string; api
   if (error) return <p className="text-sm text-red-500 text-center py-4">Erreur : {error}</p>;
   if (!data) return null;
 
-  const { theme, accentColor } = data.widget.config;
+  const { theme, accentColor, layout } = data.widget.config;
+  const reviews = data.reviews;
   const isDark = theme === 'dark';
   const bg = isDark ? '#1F2937' : '#FFFFFF';
   const border = isDark ? '#374151' : '#E5E7EB';
   const subColor = isDark ? '#9CA3AF' : '#6B7280';
 
+  function renderReviews() {
+    if (reviews.length === 0) return <p style={{ color: subColor }}>Aucun avis disponible.</p>;
+    if (layout === 'grid') {
+      return (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          {reviews.map((r, i) => <ReviewCardGrid key={i} review={r} isDark={isDark} />)}
+        </div>
+      );
+    }
+    if (layout === 'stars') {
+      return <div>{reviews.map((r, i) => <ReviewCardStars key={i} review={r} isDark={isDark} />)}</div>;
+    }
+    return <div>{reviews.map((r, i) => <ReviewCard key={i} review={r} isDark={isDark} />)}</div>;
+  }
+
   return (
     <div style={{ fontFamily: 'system-ui,-apple-system,sans-serif', background: bg, borderRadius: 12, padding: 24, border: `1px solid ${border}` }}>
       <h3 style={{ color: accentColor, margin: '0 0 20px', fontSize: 18, fontWeight: 700 }}>{data.widget.name}</h3>
-      {data.reviews.length === 0 ? (
-        <p style={{ color: subColor }}>Aucun avis disponible.</p>
-      ) : (
-        data.reviews.map((review, i) => <ReviewCard key={i} review={review} isDark={isDark} />)
-      )}
+      {renderReviews()}
       <div style={{ textAlign: 'center', marginTop: 16, fontSize: 11, color: subColor }}>Powered by WebWidget</div>
     </div>
   );
@@ -159,6 +213,7 @@ export default function WidgetDetail() {
       name: widget.name,
       placeId: config.placeId,
       placeDescription: config.placeDescription || '',
+      layout: config.layout || 'list',
       maxReviews: config.maxReviews,
       minRating: config.minRating,
       theme: config.theme,
@@ -367,6 +422,30 @@ export default function WidgetDetail() {
                 )}
               </div>
 
+              <div>
+                <label className="block text-xs text-gray-500 mb-2">Design</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { value: 'list', label: 'Liste' },
+                    { value: 'grid', label: 'Grille' },
+                    { value: 'stars', label: 'Étoiles' },
+                  ].map((l) => (
+                    <button
+                      key={l.value}
+                      type="button"
+                      onClick={() => updateField('layout', l.value)}
+                      className={`py-2 rounded-lg border-2 text-xs font-medium transition-all ${
+                        editForm.layout === l.value
+                          ? 'border-indigo-500 bg-indigo-50 text-indigo-600'
+                          : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                      }`}
+                    >
+                      {l.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">Avis max</label>
@@ -452,6 +531,10 @@ export default function WidgetDetail() {
               <div>
                 <dt className="text-gray-500 text-xs mb-0.5">Place ID</dt>
                 <dd className="font-mono text-gray-900 text-xs truncate">{config.placeId}</dd>
+              </div>
+              <div>
+                <dt className="text-gray-500 text-xs mb-0.5">Design</dt>
+                <dd className="text-gray-900">{{ list: 'Liste', grid: 'Grille', stars: 'Étoiles' }[config.layout as string] || 'Liste'}</dd>
               </div>
               <div>
                 <dt className="text-gray-500 text-xs mb-0.5">Avis max</dt>

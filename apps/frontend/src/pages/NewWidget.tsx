@@ -9,11 +9,50 @@ interface PlacePrediction {
   secondary_text: string;
 }
 
+const LAYOUTS = [
+  {
+    value: 'list',
+    label: 'Liste',
+    preview: (
+      <div className="space-y-1.5">
+        {[1,2,3].map(i => <div key={i} className="h-8 bg-gray-200 rounded" />)}
+      </div>
+    ),
+  },
+  {
+    value: 'grid',
+    label: 'Grille',
+    preview: (
+      <div className="grid grid-cols-2 gap-1.5">
+        {[1,2,3,4].map(i => <div key={i} className="h-10 bg-gray-200 rounded" />)}
+      </div>
+    ),
+  },
+  {
+    value: 'stars',
+    label: 'Étoiles',
+    preview: (
+      <div className="space-y-1.5">
+        {[1,2,3].map(i => (
+          <div key={i} className="flex items-center gap-1.5">
+            <div className="w-5 h-5 bg-gray-300 rounded-full flex-shrink-0" />
+            <div className="flex-1 h-2 bg-gray-200 rounded" />
+            <div className="flex gap-0.5">
+              {[1,2,3,4,5].map(s => <div key={s} className="w-2 h-2 bg-yellow-300 rounded-sm" />)}
+            </div>
+          </div>
+        ))}
+      </div>
+    ),
+  },
+];
+
 interface FormState {
   name: string;
   placeId: string;
   placeName: string;
   placeDescription: string;
+  layout: string;
   maxReviews: number;
   minRating: number;
   theme: string;
@@ -29,6 +68,7 @@ export default function NewWidget() {
     placeId: '',
     placeName: '',
     placeDescription: '',
+    layout: 'list',
     maxReviews: 5,
     minRating: 4,
     theme: 'light',
@@ -176,6 +216,29 @@ export default function NewWidget() {
             {form.placeId && (
               <p className="text-xs text-green-600 mt-1">✓ Lieu sélectionné</p>
             )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Design</label>
+            <div className="grid grid-cols-3 gap-3">
+              {LAYOUTS.map((layout) => (
+                <button
+                  key={layout.value}
+                  type="button"
+                  onClick={() => update('layout', layout.value)}
+                  className={`p-3 rounded-lg border-2 text-left transition-all ${
+                    form.layout === layout.value
+                      ? 'border-indigo-500 bg-indigo-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="mb-2">{layout.preview}</div>
+                  <p className={`text-xs font-medium text-center ${form.layout === layout.value ? 'text-indigo-600' : 'text-gray-500'}`}>
+                    {layout.label}
+                  </p>
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">

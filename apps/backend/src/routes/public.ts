@@ -39,6 +39,7 @@ router.get('/:id/reviews', async (req, res) => {
         config: {
           theme: config.theme || 'light',
           accentColor: config.accentColor || '#4F46E5',
+          layout: config.layout || 'list',
         },
       },
       reviews: filtered,
