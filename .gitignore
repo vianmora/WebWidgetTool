@@ -1,0 +1,21 @@
+# Env
+.env
+
+# Dependencies
+node_modules/
+apps/*/node_modules/
+
+# Build outputs
+apps/backend/dist/
+apps/frontend/dist/
+
+# Prisma
+apps/backend/prisma/migrations/*.db
+
+# Docker
+.docker/
+
+# Editor
+.vscode/
+.idea/
+*.swp

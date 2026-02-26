@@ -1,0 +1,34 @@
+import express from 'express';
+import cors from 'cors';
+import path from 'path';
+import authRouter from './routes/auth';
+import widgetsRouter from './routes/widgets';
+import publicRouter from './routes/public';
+
+const app = express();
+const PORT = process.env.PORT || 4000;
+
+const dashboardCors = cors({
+  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  credentials: true,
+});
+
+const openCors = cors();
+
+app.use(express.json());
+
+app.use('/api/auth', dashboardCors, authRouter);
+app.use('/api/widgets', dashboardCors, widgetsRouter);
+app.use('/widget', openCors, publicRouter);
+
+// Serve widget.js with open CORS
+app.get('/widget.js', openCors, (_, res) => {
+  res.setHeader('Content-Type', 'application/javascript');
+  res.sendFile(path.join(__dirname, '../public/widget.js'));
+});
+
+app.get('/health', (_, res) => res.json({ status: 'ok' }));
+
+app.listen(PORT, () => {
+  console.log(`Backend running on port ${PORT}`);
+});
