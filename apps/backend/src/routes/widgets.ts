@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth';
 import prisma from '../lib/prisma';
+import cache from '../lib/cache';
 
 const router = Router();
 
@@ -54,6 +55,7 @@ router.patch('/:id', async (req, res) => {
         ...(config !== undefined && { config }),
       },
     });
+    cache.del(req.params.id);
     res.json(widget);
   } catch (err: any) {
     res.status(500).json({ error: err.message });

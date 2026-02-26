@@ -3,6 +3,7 @@ import cors from 'cors';
 import path from 'path';
 import authRouter from './routes/auth';
 import widgetsRouter from './routes/widgets';
+import placesRouter from './routes/places';
 import publicRouter from './routes/public';
 
 const app = express();
@@ -19,6 +20,7 @@ app.use(express.json());
 
 app.use('/api/auth', dashboardCors, authRouter);
 app.use('/api/widgets', dashboardCors, widgetsRouter);
+app.use('/api/places', dashboardCors, placesRouter);
 app.use('/widget', openCors, publicRouter);
 
 // Serve widget.js with open CORS
