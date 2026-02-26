@@ -2,12 +2,112 @@ import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import api from '../lib/api';
 
+interface Review {
+  author_name: string;
+  rating: number;
+  text: string;
+  profile_photo_url: string;
+  relative_time_description: string;
+}
+
+interface PreviewData {
+  widget: { id: string; name: string; config: { theme: string; accentColor: string } };
+  reviews: Review[];
+}
+
 interface Widget {
   id: string;
   name: string;
   type: string;
   config: Record<string, unknown>;
   createdAt: string;
+}
+
+function StarRating({ rating }: { rating: number }) {
+  return (
+    <span>
+      {[1, 2, 3, 4, 5].map((i) => (
+        <span key={i} style={{ color: i <= rating ? '#FBBF24' : '#D1D5DB' }}>★</span>
+      ))}
+    </span>
+  );
+}
+
+function ReviewCard({ review, isDark }: { review: Review; isDark: boolean }) {
+  const bg = isDark ? '#111827' : '#F9FAFB';
+  const border = isDark ? '#374151' : '#E5E7EB';
+  const textColor = isDark ? '#F9FAFB' : '#111827';
+  const subColor = isDark ? '#9CA3AF' : '#6B7280';
+
+  return (
+    <div style={{ padding: 16, background: bg, borderRadius: 8, border: `1px solid ${border}`, marginBottom: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+        {review.profile_photo_url && (
+          <img
+            src={review.profile_photo_url}
+            alt={review.author_name}
+            style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
+            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+          />
+        )}
+        <div>
+          <div style={{ fontWeight: 600, fontSize: 14, color: textColor }}>{review.author_name}</div>
+          <StarRating rating={review.rating} />
+        </div>
+      </div>
+      {review.text && (
+        <p style={{ color: subColor, margin: 0, fontSize: 14, lineHeight: 1.6 }}>{review.text}</p>
+      )}
+      {review.relative_time_description && (
+        <div style={{ color: subColor, fontSize: 12, marginTop: 8 }}>{review.relative_time_description}</div>
+      )}
+    </div>
+  );
+}
+
+function WidgetPreview({ widgetId, apiUrl }: { widgetId: string; apiUrl: string }) {
+  const [data, setData] = useState<PreviewData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    fetch(`${apiUrl}/widget/${widgetId}/reviews`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.error) throw new Error(d.error);
+        setData(d);
+      })
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  }, [widgetId, apiUrl]);
+
+  if (loading) {
+    return <p className="text-sm text-gray-400 text-center py-8">Chargement de l'aperçu…</p>;
+  }
+  if (error) {
+    return <p className="text-sm text-red-500 text-center py-4">Erreur : {error}</p>;
+  }
+  if (!data) return null;
+
+  const { theme, accentColor } = data.widget.config;
+  const isDark = theme === 'dark';
+  const bg = isDark ? '#1F2937' : '#FFFFFF';
+  const border = isDark ? '#374151' : '#E5E7EB';
+  const subColor = isDark ? '#9CA3AF' : '#6B7280';
+
+  return (
+    <div style={{ fontFamily: 'system-ui,-apple-system,sans-serif', background: bg, borderRadius: 12, padding: 24, border: `1px solid ${border}` }}>
+      <h3 style={{ color: accentColor, margin: '0 0 20px', fontSize: 18, fontWeight: 700 }}>{data.widget.name}</h3>
+      {data.reviews.length === 0 ? (
+        <p style={{ color: subColor }}>Aucun avis disponible.</p>
+      ) : (
+        data.reviews.map((review, i) => (
+          <ReviewCard key={i} review={review} isDark={isDark} />
+        ))
+      )}
+      <div style={{ textAlign: 'center', marginTop: 16, fontSize: 11, color: subColor }}>Powered by WebWidget</div>
+    </div>
+  );
 }
 
 export default function WidgetDetail() {
@@ -95,6 +195,12 @@ export default function WidgetDetail() {
           </p>
         </div>
 
+        {/* Aperçu */}
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <h2 className="font-semibold text-gray-900 mb-4">Aperçu</h2>
+          {id && <WidgetPreview widgetId={id} apiUrl={apiUrl} />}
+        </div>
+
         {/* Configuration */}
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <h2 className="font-semibold text-gray-900 mb-4">Configuration</h2>
@@ -130,10 +236,6 @@ export default function WidgetDetail() {
           </dl>
         </div>
 
-        {/* Info aperçu */}
-        <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4 text-sm text-indigo-700">
-          Pour voir le widget en action, intégrez le snippet dans une page HTML et ouvrez-la dans votre navigateur.
-        </div>
       </main>
     </div>
   );
