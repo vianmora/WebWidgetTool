@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import api from '../lib/api';
 
@@ -21,6 +21,13 @@ interface Widget {
   type: string;
   config: Record<string, unknown>;
   createdAt: string;
+}
+
+interface PlacePrediction {
+  place_id: string;
+  description: string;
+  main_text: string;
+  secondary_text: string;
 }
 
 function StarRating({ rating }: { rating: number }) {
@@ -65,12 +72,14 @@ function ReviewCard({ review, isDark }: { review: Review; isDark: boolean }) {
   );
 }
 
-function WidgetPreview({ widgetId, apiUrl }: { widgetId: string; apiUrl: string }) {
+function WidgetPreview({ widgetId, apiUrl, refreshKey }: { widgetId: string; apiUrl: string; refreshKey: number }) {
   const [data, setData] = useState<PreviewData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
+    setLoading(true);
+    setError('');
     fetch(`${apiUrl}/widget/${widgetId}/reviews`)
       .then((r) => r.json())
       .then((d) => {
@@ -79,14 +88,10 @@ function WidgetPreview({ widgetId, apiUrl }: { widgetId: string; apiUrl: string 
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
-  }, [widgetId, apiUrl]);
+  }, [widgetId, apiUrl, refreshKey]);
 
-  if (loading) {
-    return <p className="text-sm text-gray-400 text-center py-8">Chargement de l'aperçu…</p>;
-  }
-  if (error) {
-    return <p className="text-sm text-red-500 text-center py-4">Erreur : {error}</p>;
-  }
+  if (loading) return <p className="text-sm text-gray-400 text-center py-8">Chargement de l'aperçu…</p>;
+  if (error) return <p className="text-sm text-red-500 text-center py-4">Erreur : {error}</p>;
   if (!data) return null;
 
   const { theme, accentColor } = data.widget.config;
@@ -101,9 +106,7 @@ function WidgetPreview({ widgetId, apiUrl }: { widgetId: string; apiUrl: string 
       {data.reviews.length === 0 ? (
         <p style={{ color: subColor }}>Aucun avis disponible.</p>
       ) : (
-        data.reviews.map((review, i) => (
-          <ReviewCard key={i} review={review} isDark={isDark} />
-        ))
+        data.reviews.map((review, i) => <ReviewCard key={i} review={review} isDark={isDark} />)
       )}
       <div style={{ textAlign: 'center', marginTop: 16, fontSize: 11, color: subColor }}>Powered by WebWidget</div>
     </div>
@@ -116,15 +119,117 @@ export default function WidgetDetail() {
   const [widget, setWidget] = useState<Widget | null>(null);
   const [copied, setCopied] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [previewKey, setPreviewKey] = useState(0);
+
+  // Edit mode
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [editError, setEditError] = useState('');
+  const [editForm, setEditForm] = useState<Record<string, any>>({});
+
+  // Place autocomplete
+  const [search, setSearch] = useState('');
+  const [suggestions, setSuggestions] = useState<PlacePrediction[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const apiUrl = import.meta.env.VITE_API_URL || window.location.origin;
   const snippet = `<div id="gw-widget"></div>\n<script src="${apiUrl}/widget.js" data-widget-id="${id}"></script>`;
 
   useEffect(() => {
-    if (id) {
-      api.get(`/api/widgets/${id}`).then(({ data }) => setWidget(data));
-    }
+    if (id) api.get(`/api/widgets/${id}`).then(({ data }) => setWidget(data));
   }, [id]);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setShowDropdown(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  function startEditing() {
+    if (!widget) return;
+    const config = widget.config as any;
+    setEditForm({
+      name: widget.name,
+      placeId: config.placeId,
+      placeDescription: config.placeDescription || '',
+      maxReviews: config.maxReviews,
+      minRating: config.minRating,
+      theme: config.theme,
+      accentColor: config.accentColor,
+    });
+    setSearch(config.placeDescription || '');
+    setEditing(true);
+    setEditError('');
+  }
+
+  function cancelEditing() {
+    setEditing(false);
+    setEditError('');
+    setSuggestions([]);
+    setShowDropdown(false);
+  }
+
+  function updateField(field: string, value: any) {
+    setEditForm((f) => ({ ...f, [field]: value }));
+  }
+
+  function handleSearchChange(value: string) {
+    setSearch(value);
+    updateField('placeId', '');
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (value.trim().length < 2) {
+      setSuggestions([]);
+      setShowDropdown(false);
+      return;
+    }
+    debounceRef.current = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const { data } = await api.get('/api/places/search', { params: { q: value } });
+        setSuggestions(data);
+        setShowDropdown(data.length > 0);
+      } catch {
+        setSuggestions([]);
+      } finally {
+        setSearching(false);
+      }
+    }, 350);
+  }
+
+  function selectPlace(place: PlacePrediction) {
+    setSearch(place.description);
+    updateField('placeId', place.place_id);
+    updateField('placeDescription', place.description);
+    setSuggestions([]);
+    setShowDropdown(false);
+  }
+
+  async function handleSave() {
+    if (!editForm.placeId) {
+      setEditError('Veuillez sélectionner un lieu dans la liste.');
+      return;
+    }
+    setSaving(true);
+    setEditError('');
+    try {
+      const { name, ...config } = editForm;
+      const { data } = await api.patch(`/api/widgets/${id}`, { name, config });
+      setWidget(data);
+      setEditing(false);
+      setPreviewKey((k) => k + 1);
+    } catch {
+      setEditError('Erreur lors de la sauvegarde.');
+    } finally {
+      setSaving(false);
+    }
+  }
 
   function copySnippet() {
     navigator.clipboard.writeText(snippet);
@@ -198,42 +303,182 @@ export default function WidgetDetail() {
         {/* Aperçu */}
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <h2 className="font-semibold text-gray-900 mb-4">Aperçu</h2>
-          {id && <WidgetPreview widgetId={id} apiUrl={apiUrl} />}
+          {id && <WidgetPreview widgetId={id} apiUrl={apiUrl} refreshKey={previewKey} />}
         </div>
 
         {/* Configuration */}
         <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h2 className="font-semibold text-gray-900 mb-4">Configuration</h2>
-          <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-            <div>
-              <dt className="text-gray-500 text-xs mb-0.5">Place ID</dt>
-              <dd className="font-mono text-gray-900 text-xs truncate">{config.placeId}</dd>
-            </div>
-            <div>
-              <dt className="text-gray-500 text-xs mb-0.5">Avis max</dt>
-              <dd className="text-gray-900">{config.maxReviews}</dd>
-            </div>
-            <div>
-              <dt className="text-gray-500 text-xs mb-0.5">Note minimale</dt>
-              <dd className="text-gray-900">{config.minRating}★ et +</dd>
-            </div>
-            <div>
-              <dt className="text-gray-500 text-xs mb-0.5">Thème</dt>
-              <dd className="text-gray-900">{config.theme === 'dark' ? 'Sombre' : 'Clair'}</dd>
-            </div>
-            <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-semibold text-gray-900">Configuration</h2>
+            {!editing && (
+              <button
+                onClick={startEditing}
+                className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-3 py-1.5 rounded-lg transition-colors font-medium"
+              >
+                Modifier
+              </button>
+            )}
+          </div>
+
+          {editing ? (
+            <div className="space-y-4">
               <div>
-                <dt className="text-gray-500 text-xs mb-0.5">Couleur accent</dt>
-                <dd className="flex items-center gap-2">
-                  <span
-                    className="inline-block w-4 h-4 rounded border border-gray-200"
-                    style={{ background: config.accentColor }}
+                <label className="block text-xs text-gray-500 mb-1">Nom du widget</label>
+                <input
+                  type="text"
+                  value={editForm.name}
+                  onChange={(e) => updateField('name', e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Lieu</label>
+                <div className="relative" ref={dropdownRef}>
+                  <input
+                    type="text"
+                    value={search}
+                    onChange={(e) => handleSearchChange(e.target.value)}
+                    onFocus={() => suggestions.length > 0 && setShowDropdown(true)}
+                    placeholder="Rechercher un établissement…"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    autoComplete="off"
                   />
-                  <span className="text-gray-900 font-mono text-xs">{config.accentColor}</span>
-                </dd>
+                  {searching && (
+                    <span className="absolute right-3 top-2.5 text-gray-400 text-xs">Recherche…</span>
+                  )}
+                  {showDropdown && (
+                    <ul className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                      {suggestions.map((place) => (
+                        <li
+                          key={place.place_id}
+                          onMouseDown={() => selectPlace(place)}
+                          className="px-4 py-3 cursor-pointer hover:bg-indigo-50 border-b border-gray-100 last:border-0"
+                        >
+                          <p className="text-sm font-medium text-gray-900">{place.main_text}</p>
+                          <p className="text-xs text-gray-400">{place.secondary_text}</p>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                {editForm.placeId && (
+                  <p className="text-xs text-green-600 mt-1">✓ Lieu sélectionné</p>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Avis max</label>
+                  <select
+                    value={editForm.maxReviews}
+                    onChange={(e) => updateField('maxReviews', parseInt(e.target.value))}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    {[3, 5, 10].map((n) => <option key={n} value={n}>{n} avis</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Note minimale</label>
+                  <select
+                    value={editForm.minRating}
+                    onChange={(e) => updateField('minRating', parseInt(e.target.value))}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}★ et +</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Thème</label>
+                  <select
+                    value={editForm.theme}
+                    onChange={(e) => updateField('theme', e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="light">Clair</option>
+                    <option value="dark">Sombre</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Couleur accent</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="color"
+                      value={editForm.accentColor}
+                      onChange={(e) => updateField('accentColor', e.target.value)}
+                      className="h-9 w-10 border border-gray-300 rounded-lg cursor-pointer p-0.5"
+                    />
+                    <input
+                      type="text"
+                      value={editForm.accentColor}
+                      onChange={(e) => updateField('accentColor', e.target.value)}
+                      className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {editError && (
+                <p className="text-red-500 text-sm bg-red-50 px-3 py-2 rounded-lg">{editError}</p>
+              )}
+
+              <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">
+                <button
+                  onClick={cancelEditing}
+                  className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800"
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="bg-indigo-600 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+                >
+                  {saving ? 'Sauvegarde…' : 'Sauvegarder'}
+                </button>
               </div>
             </div>
-          </dl>
+          ) : (
+            <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+              {config.placeDescription && (
+                <div className="col-span-2">
+                  <dt className="text-gray-500 text-xs mb-0.5">Adresse</dt>
+                  <dd className="text-gray-900 text-xs">{config.placeDescription}</dd>
+                </div>
+              )}
+              <div>
+                <dt className="text-gray-500 text-xs mb-0.5">Place ID</dt>
+                <dd className="font-mono text-gray-900 text-xs truncate">{config.placeId}</dd>
+              </div>
+              <div>
+                <dt className="text-gray-500 text-xs mb-0.5">Avis max</dt>
+                <dd className="text-gray-900">{config.maxReviews}</dd>
+              </div>
+              <div>
+                <dt className="text-gray-500 text-xs mb-0.5">Note minimale</dt>
+                <dd className="text-gray-900">{config.minRating}★ et +</dd>
+              </div>
+              <div>
+                <dt className="text-gray-500 text-xs mb-0.5">Thème</dt>
+                <dd className="text-gray-900">{config.theme === 'dark' ? 'Sombre' : 'Clair'}</dd>
+              </div>
+              <div className="flex items-center gap-2">
+                <div>
+                  <dt className="text-gray-500 text-xs mb-0.5">Couleur accent</dt>
+                  <dd className="flex items-center gap-2">
+                    <span
+                      className="inline-block w-4 h-4 rounded border border-gray-200"
+                      style={{ background: config.accentColor }}
+                    />
+                    <span className="text-gray-900 font-mono text-xs">{config.accentColor}</span>
+                  </dd>
+                </div>
+              </div>
+            </dl>
+          )}
         </div>
 
       </main>

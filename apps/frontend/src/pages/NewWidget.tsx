@@ -13,6 +13,7 @@ interface FormState {
   name: string;
   placeId: string;
   placeName: string;
+  placeDescription: string;
   maxReviews: number;
   minRating: number;
   theme: string;
@@ -27,6 +28,7 @@ export default function NewWidget() {
     name: '',
     placeId: '',
     placeName: '',
+    placeDescription: '',
     maxReviews: 5,
     minRating: 4,
     theme: 'light',
@@ -85,6 +87,7 @@ export default function NewWidget() {
     setSearch(place.description);
     update('placeId', place.place_id);
     update('placeName', place.main_text);
+    update('placeDescription', place.description);
     setSuggestions([]);
     setShowDropdown(false);
   }
@@ -99,6 +102,7 @@ export default function NewWidget() {
     setLoading(true);
     try {
       const { name, placeName, ...config } = form;
+      // placeName used only for widget name fallback, placeDescription stays in config
       const { data } = await api.post('/api/widgets', {
         name: name || placeName,
         type: 'google_reviews',
