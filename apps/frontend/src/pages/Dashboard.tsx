@@ -148,16 +148,71 @@ export default function Dashboard() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" ref={menuRef}>
             {widgets.map((widget) => (
-              <div key={widget.id} className="relative group">
+              <div key={widget.id} className="group">
                 <Link to={`/widgets/${widget.id}`}>
                   <div className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-md hover:border-indigo-200 transition-all cursor-pointer">
+
+                    {/* Header row: icon | tag + 3-dot menu (inline, no overlap) */}
                     <div className="flex items-start justify-between mb-3">
                       <span className="text-2xl">⭐</span>
-                      <span className="text-xs bg-indigo-50 text-indigo-600 px-2 py-1 rounded-full font-medium">
-                        {widget.type === 'google_reviews' ? 'Avis Google' : widget.type}
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs bg-indigo-50 text-indigo-600 px-2 py-1 rounded-full font-medium">
+                          {widget.type === 'google_reviews' ? 'Avis Google' : widget.type}
+                        </span>
+                        <div className="relative">
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setOpenMenu(openMenu === widget.id ? null : widget.id);
+                            }}
+                            className="w-7 h-7 flex items-center justify-center rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+                            title="Actions"
+                          >
+                            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                              <circle cx="8" cy="2.5" r="1.5"/>
+                              <circle cx="8" cy="8" r="1.5"/>
+                              <circle cx="8" cy="13.5" r="1.5"/>
+                            </svg>
+                          </button>
+
+                          {openMenu === widget.id && (
+                            <div
+                              className="absolute right-0 top-8 z-20 w-44 bg-white rounded-xl border border-gray-200 shadow-lg py-1"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <button
+                                onClick={(e) => { e.preventDefault(); navigate(`/widgets/${widget.id}`); }}
+                                className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                              >
+                                <span>✏️</span> Modifier
+                              </button>
+                              <button
+                                onClick={(e) => { e.preventDefault(); openRename(widget); }}
+                                className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                              >
+                                <span>🏷️</span> Renommer
+                              </button>
+                              <button
+                                onClick={(e) => { e.preventDefault(); handleDuplicate(widget); }}
+                                className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                              >
+                                <span>📋</span> Dupliquer
+                              </button>
+                              <div className="border-t border-gray-100 my-1" />
+                              <button
+                                onClick={(e) => { e.preventDefault(); openDeleteConfirm(widget.id); }}
+                                className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                              >
+                                <span>🗑️</span> Supprimer
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                    <h3 className="font-semibold text-gray-900 text-sm pr-8">
+
+                    <h3 className="font-semibold text-gray-900 text-sm">
                       {duplicating === widget.id ? 'Duplication…' : widget.name}
                     </h3>
                     <p className="text-xs text-gray-400 mt-1">
@@ -165,58 +220,6 @@ export default function Dashboard() {
                     </p>
                   </div>
                 </Link>
-
-                {/* Actions menu button */}
-                <div className="absolute top-3 right-3">
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setOpenMenu(openMenu === widget.id ? null : widget.id);
-                    }}
-                    className="w-7 h-7 flex items-center justify-center rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
-                    title="Actions"
-                  >
-                    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-                      <circle cx="8" cy="2.5" r="1.5"/>
-                      <circle cx="8" cy="8" r="1.5"/>
-                      <circle cx="8" cy="13.5" r="1.5"/>
-                    </svg>
-                  </button>
-
-                  {openMenu === widget.id && (
-                    <div
-                      className="absolute right-0 top-8 z-20 w-44 bg-white rounded-xl border border-gray-200 shadow-lg py-1"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <button
-                        onClick={(e) => { e.preventDefault(); navigate(`/widgets/${widget.id}`); }}
-                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                      >
-                        <span>✏️</span> Modifier
-                      </button>
-                      <button
-                        onClick={(e) => { e.preventDefault(); openRename(widget); }}
-                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                      >
-                        <span>🏷️</span> Renommer
-                      </button>
-                      <button
-                        onClick={(e) => { e.preventDefault(); handleDuplicate(widget); }}
-                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                      >
-                        <span>📋</span> Dupliquer
-                      </button>
-                      <div className="border-t border-gray-100 my-1" />
-                      <button
-                        onClick={(e) => { e.preventDefault(); openDeleteConfirm(widget.id); }}
-                        className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
-                      >
-                        <span>🗑️</span> Supprimer
-                      </button>
-                    </div>
-                  )}
-                </div>
               </div>
             ))}
             <Link to="/widgets/new" className="h-full min-h-[100px]">
