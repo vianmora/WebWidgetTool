@@ -1,0 +1,54 @@
+# =============================================================================
+# Production — single all-in-one image
+#
+# Usage:
+#   cp .env.example .env.prod   # fill in all required variables
+#   docker compose -f docker-compose.prod.yml --env-file .env.prod up --build -d
+#
+# The app is reachable on http://host:${PORT:-3000}
+# Put a reverse proxy (Nginx, Caddy, Traefik…) in front for HTTPS.
+# =============================================================================
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER:     ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB:       widgets
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "${PORT:-3000}:4000"
+    environment:
+      DATABASE_URL:               postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/widgets
+      ADMIN_EMAIL:                ${ADMIN_EMAIL:?ADMIN_EMAIL is required}
+      ADMIN_PASSWORD:             ${ADMIN_PASSWORD:?ADMIN_PASSWORD is required}
+      JWT_SECRET:                 ${JWT_SECRET:?JWT_SECRET is required}
+      GOOGLE_MAPS_API_KEY:        ${GOOGLE_MAPS_API_KEY}
+      GOOGLE_REVIEWS_CACHE_TTL:   ${GOOGLE_REVIEWS_CACHE_TTL:-604800}
+      # FRONTEND_URL must match the public URL of the app (for CORS on embedded widgets)
+      FRONTEND_URL:               ${APP_URL:-http://localhost:3000}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:4000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  postgres_data:

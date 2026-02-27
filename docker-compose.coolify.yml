@@ -1,0 +1,58 @@
+# =============================================================================
+# Coolify deployment — all-in-one image
+#
+# How to deploy on Coolify:
+#   1. Create a new "Docker Compose" resource in Coolify.
+#   2. Point it to this file (docker-compose.coolify.yml).
+#   3. Set the environment variables listed below in the Coolify UI.
+#   4. Coolify will automatically assign a domain to the `app` service
+#      and inject SERVICE_FQDN_APP_4000 into the environment.
+#
+# The ${SERVICE_FQDN_APP_4000} variable is provided by Coolify and resolves
+# to the public HTTPS URL assigned to port 4000 of the `app` service.
+# =============================================================================
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER:     ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB:       widgets
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    # No `ports` here — Coolify handles ingress and TLS termination.
+    expose:
+      - "4000"
+    environment:
+      DATABASE_URL:             postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/widgets
+      ADMIN_EMAIL:              ${ADMIN_EMAIL}
+      ADMIN_PASSWORD:           ${ADMIN_PASSWORD}
+      JWT_SECRET:               ${JWT_SECRET}
+      GOOGLE_MAPS_API_KEY:      ${GOOGLE_MAPS_API_KEY}
+      GOOGLE_REVIEWS_CACHE_TTL: ${GOOGLE_REVIEWS_CACHE_TTL:-604800}
+      # Coolify injects the public URL as SERVICE_FQDN_APP_4000
+      FRONTEND_URL:             ${SERVICE_FQDN_APP_4000}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:4000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  postgres_data:
