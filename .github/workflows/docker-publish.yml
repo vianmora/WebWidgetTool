@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
   check-and-push:
@@ -17,6 +18,12 @@ jobs:
 
           RESPONSE=$(curl -s "https://hub.docker.com/v2/repositories/${USERNAME}/${REPO}/tags/latest")
           LAST_UPDATED=$(echo "$RESPONSE" | jq -r '.last_updated // empty')
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "Manual trigger, skipping date check"
+            echo "should_push=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
 
           if [ -z "$LAST_UPDATED" ]; then
             echo "No existing image, will push"
