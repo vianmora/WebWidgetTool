@@ -157,7 +157,7 @@ export default function Dashboard() {
                       <span className="text-2xl">⭐</span>
                       <div className="flex items-center gap-1.5">
                         <span className="text-xs bg-indigo-50 text-indigo-600 px-2 py-1 rounded-full font-medium">
-                          {widget.type === 'google_reviews' ? 'Avis Google' : widget.type}
+                          {widget.type === 'google_reviews' ? 'Avis Google' : widget.type === 'google_reviews_webhook' ? 'Webhook JSON' : widget.type}
                         </span>
                         <div className="relative">
                           <button

@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import api from '../lib/api';
-import { LivePreview, StarRating, Toggle, LAYOUTS, FORM_DEFAULTS } from './NewWidget';
+import { LivePreview, Toggle, LAYOUTS, FORM_DEFAULTS } from './NewWidget';
 
 interface Review {
   author_name: string;
@@ -44,6 +44,13 @@ interface PlacePrediction {
   secondary_text: string;
 }
 
+const LANGUAGES = [
+  { value: 'fr', label: 'Français' },
+  { value: 'en', label: 'English' },
+  { value: 'es', label: 'Español' },
+  { value: 'de', label: 'Deutsch' },
+];
+
 function WidgetPreview({ widgetId, apiUrl, refreshKey }: { widgetId: string; apiUrl: string; refreshKey: number }) {
   const [data, setData] = useState<PreviewData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -84,11 +91,41 @@ function WidgetPreview({ widgetId, apiUrl, refreshKey }: { widgetId: string; api
   );
 }
 
+function WebhookJsonPreview({ widgetId, apiUrl, refreshKey }: { widgetId: string; apiUrl: string; refreshKey: number }) {
+  const [data, setData] = useState<unknown>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    setLoading(true);
+    setError('');
+    fetch(`${apiUrl}/widget/${widgetId}/reviews`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.error) throw new Error(d.error);
+        setData(d);
+      })
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  }, [widgetId, apiUrl, refreshKey]);
+
+  if (loading) return <p className="text-sm text-gray-400 text-center py-8">Chargement…</p>;
+  if (error) return <p className="text-sm text-red-500 text-center py-4">Erreur : {error}</p>;
+  if (!data) return null;
+
+  return (
+    <pre className="bg-gray-950 text-blue-300 text-xs rounded-lg p-4 overflow-x-auto leading-relaxed max-h-96">
+      {JSON.stringify(data, null, 2)}
+    </pre>
+  );
+}
+
 export default function WidgetDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [widget, setWidget] = useState<Widget | null>(null);
   const [copied, setCopied] = useState(false);
+  const [copiedUrl, setCopiedUrl] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [previewKey, setPreviewKey] = useState(0);
 
@@ -108,6 +145,7 @@ export default function WidgetDetail() {
 
   const apiUrl = import.meta.env.VITE_API_URL || window.location.origin;
   const snippet = `<div id="gw-widget"></div>\n<script src="${apiUrl}/widget.js" data-widget-id="${id}"></script>`;
+  const webhookUrl = `${apiUrl}/widget/${id}/reviews`;
 
   useEffect(() => {
     if (id) api.get(`/api/widgets/${id}`).then(({ data }) => setWidget(data));
@@ -126,20 +164,24 @@ export default function WidgetDetail() {
   function startEditing() {
     if (!widget) return;
     const c = widget.config as any;
+    const isWebhook = widget.type === 'google_reviews_webhook';
     setEditForm({
       name: widget.name,
       placeId: c.placeId,
       placeDescription: c.placeDescription || '',
-      layout: c.layout || 'list',
+      ...(isWebhook ? {} : {
+        layout: c.layout || 'list',
+        theme: c.theme || FORM_DEFAULTS.theme,
+        accentColor: c.accentColor || FORM_DEFAULTS.accentColor,
+        showHeader: c.showHeader !== false,
+        headerTitle: c.headerTitle || '',
+        showAvatar: c.showAvatar !== false,
+        showDate: c.showDate !== false,
+        truncateText: c.truncateText !== false,
+      }),
       maxReviews: c.maxReviews ?? FORM_DEFAULTS.maxReviews,
       minRating: c.minRating ?? FORM_DEFAULTS.minRating,
-      theme: c.theme || FORM_DEFAULTS.theme,
-      accentColor: c.accentColor || FORM_DEFAULTS.accentColor,
-      showHeader: c.showHeader !== false,
-      headerTitle: c.headerTitle || '',
-      showAvatar: c.showAvatar !== false,
-      showDate: c.showDate !== false,
-      truncateText: c.truncateText !== false,
+      language: c.language || 'fr',
     });
     setSearch(c.placeDescription || '');
     setEditing(true);
@@ -214,6 +256,12 @@ export default function WidgetDetail() {
     setTimeout(() => setCopied(false), 2000);
   }
 
+  function copyWebhookUrl() {
+    navigator.clipboard.writeText(webhookUrl);
+    setCopiedUrl(true);
+    setTimeout(() => setCopiedUrl(false), 2000);
+  }
+
   async function handleDelete() {
     if (!confirm('Supprimer ce widget définitivement ?')) return;
     setDeleting(true);
@@ -230,24 +278,15 @@ export default function WidgetDetail() {
   }
 
   const config = widget.config as any;
+  const isWebhook = widget.type === 'google_reviews_webhook';
 
   const layoutLabel: Record<string, string> = {
     list: 'Liste', grid: 'Grille', stars: 'Étoiles', slider: 'Slider', badge: 'Badge',
   };
 
-  // Live preview props for edit mode
-  const editPreviewProps = editing ? {
-    reviews: [],
-    layout: editForm.layout || 'list',
-    theme: editForm.theme || 'light',
-    accentColor: editForm.accentColor || '#4F46E5',
-    widgetName: editForm.name || widget.name,
-    showHeader: editForm.showHeader !== false,
-    headerTitle: editForm.headerTitle || '',
-    showAvatar: editForm.showAvatar !== false,
-    showDate: editForm.showDate !== false,
-    truncateText: editForm.truncateText !== false,
-  } : null;
+  const typeLabel = widget.type === 'google_reviews' ? 'Avis Google'
+    : widget.type === 'google_reviews_webhook' ? 'Webhook JSON'
+    : widget.type;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -258,7 +297,7 @@ export default function WidgetDetail() {
             <div>
               <h1 className="text-lg font-bold text-gray-900">{widget.name}</h1>
               <p className="text-xs text-gray-400">
-                {widget.type === 'google_reviews' ? 'Avis Google' : widget.type}
+                {typeLabel}
                 {' · '}
                 Créé le {new Date(widget.createdAt).toLocaleDateString('fr-FR')}
               </p>
@@ -276,30 +315,87 @@ export default function WidgetDetail() {
 
       <main className="max-w-4xl mx-auto px-4 py-8 space-y-5">
 
-        {/* Code à intégrer */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="font-semibold text-gray-900">Code à intégrer</h2>
-            <button
-              onClick={copySnippet}
-              className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-3 py-1.5 rounded-lg transition-colors font-medium"
-            >
-              {copied ? '✓ Copié !' : 'Copier'}
-            </button>
-          </div>
-          <pre className="bg-gray-950 text-green-400 text-xs rounded-lg p-4 overflow-x-auto leading-relaxed">
-            {snippet}
-          </pre>
-          <p className="text-xs text-gray-400 mt-3">
-            Collez ce code dans votre page HTML à l'endroit où vous souhaitez afficher les avis.
-          </p>
-        </div>
+        {isWebhook ? (
+          /* ── WEBHOOK ─────────────────────────────────────────────── */
+          <>
+            {/* Endpoint webhook */}
+            <div className="bg-white rounded-xl border border-gray-200 p-6">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="font-semibold text-gray-900">Endpoint webhook</h2>
+                <button
+                  onClick={copyWebhookUrl}
+                  className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-3 py-1.5 rounded-lg transition-colors font-medium"
+                >
+                  {copiedUrl ? '✓ Copié !' : 'Copier l\'URL'}
+                </button>
+              </div>
+              <pre className="bg-gray-950 text-green-400 text-xs rounded-lg p-4 overflow-x-auto leading-relaxed">
+                GET {webhookUrl}
+              </pre>
+            </div>
 
-        {/* Aperçu */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h2 className="font-semibold text-gray-900 mb-4">Aperçu</h2>
-          {id && <WidgetPreview widgetId={id} apiUrl={apiUrl} refreshKey={previewKey} />}
-        </div>
+            {/* Exemple curl */}
+            <div className="bg-white rounded-xl border border-gray-200 p-6">
+              <h2 className="font-semibold text-gray-900 mb-3">Exemple curl</h2>
+              <pre className="bg-gray-950 text-green-400 text-xs rounded-lg p-4 overflow-x-auto leading-relaxed">
+                {`curl "${webhookUrl}"`}
+              </pre>
+            </div>
+
+            {/* Structure de la réponse */}
+            <div className="bg-white rounded-xl border border-gray-200 p-6">
+              <h2 className="font-semibold text-gray-900 mb-3">Structure de la réponse</h2>
+              <pre className="bg-gray-950 text-blue-300 text-xs rounded-lg p-4 overflow-x-auto leading-relaxed">
+{`{
+  "widget": { "id": "…", "name": "…" },
+  "reviews": [
+    {
+      "author_name": "Marie Dupont",
+      "rating": 5,
+      "text": "Excellent service !",
+      "profile_photo_url": "https://…",
+      "relative_time_description": "il y a 2 semaines"
+    }
+  ]
+}`}
+              </pre>
+            </div>
+
+            {/* Aperçu live JSON */}
+            <div className="bg-white rounded-xl border border-gray-200 p-6">
+              <h2 className="font-semibold text-gray-900 mb-4">Aperçu live</h2>
+              {id && <WebhookJsonPreview widgetId={id} apiUrl={apiUrl} refreshKey={previewKey} />}
+            </div>
+          </>
+        ) : (
+          /* ── WIDGET ──────────────────────────────────────────────── */
+          <>
+            {/* Code à intégrer */}
+            <div className="bg-white rounded-xl border border-gray-200 p-6">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="font-semibold text-gray-900">Code à intégrer</h2>
+                <button
+                  onClick={copySnippet}
+                  className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-3 py-1.5 rounded-lg transition-colors font-medium"
+                >
+                  {copied ? '✓ Copié !' : 'Copier'}
+                </button>
+              </div>
+              <pre className="bg-gray-950 text-green-400 text-xs rounded-lg p-4 overflow-x-auto leading-relaxed">
+                {snippet}
+              </pre>
+              <p className="text-xs text-gray-400 mt-3">
+                Collez ce code dans votre page HTML à l'endroit où vous souhaitez afficher les avis.
+              </p>
+            </div>
+
+            {/* Aperçu */}
+            <div className="bg-white rounded-xl border border-gray-200 p-6">
+              <h2 className="font-semibold text-gray-900 mb-4">Aperçu</h2>
+              {id && <WidgetPreview widgetId={id} apiUrl={apiUrl} refreshKey={previewKey} />}
+            </div>
+          </>
+        )}
 
         {/* Configuration */}
         <div className="bg-white rounded-xl border border-gray-200 p-6">
@@ -365,28 +461,111 @@ export default function WidgetDetail() {
                 )}
               </div>
 
-              {/* Layout */}
-              <div>
-                <label className="block text-xs text-gray-500 mb-2">Mise en page</label>
-                <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
-                  {LAYOUTS.map((l) => (
-                    <button
-                      key={l.value}
-                      type="button"
-                      onClick={() => updateField('layout', l.value)}
-                      className={`p-2 rounded-lg border-2 text-xs font-medium transition-all ${
-                        editForm.layout === l.value
-                          ? 'border-indigo-500 bg-indigo-50 text-indigo-600'
-                          : 'border-gray-200 text-gray-500 hover:border-gray-300'
-                      }`}
-                    >
-                      {l.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
+              {/* Widget-only fields */}
+              {!isWebhook && (
+                <>
+                  {/* Layout */}
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-2">Mise en page</label>
+                    <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                      {LAYOUTS.map((l) => (
+                        <button
+                          key={l.value}
+                          type="button"
+                          onClick={() => updateField('layout', l.value)}
+                          className={`p-2 rounded-lg border-2 text-xs font-medium transition-all ${
+                            editForm.layout === l.value
+                              ? 'border-indigo-500 bg-indigo-50 text-indigo-600'
+                              : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                          }`}
+                        >
+                          {l.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
 
-              {/* Filters */}
+                  {/* Theme + color */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Thème</label>
+                      <select
+                        value={editForm.theme}
+                        onChange={(e) => updateField('theme', e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      >
+                        <option value="light">Clair</option>
+                        <option value="dark">Sombre</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Couleur accent</label>
+                      <div className="flex gap-2">
+                        <input
+                          type="color"
+                          value={editForm.accentColor}
+                          onChange={(e) => updateField('accentColor', e.target.value)}
+                          className="h-9 w-10 border border-gray-300 rounded-lg cursor-pointer p-0.5"
+                        />
+                        <input
+                          type="text"
+                          value={editForm.accentColor}
+                          onChange={(e) => updateField('accentColor', e.target.value)}
+                          className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Header design */}
+                  <div className="border-t border-gray-100 pt-4">
+                    <p className="text-xs font-semibold text-gray-700 mb-3">En-tête</p>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <label className="text-sm text-gray-600">Afficher l'en-tête</label>
+                        <Toggle checked={editForm.showHeader !== false} onChange={v => updateField('showHeader', v)} />
+                      </div>
+                      {editForm.showHeader !== false && (
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">Titre personnalisé</label>
+                          <input
+                            type="text"
+                            value={editForm.headerTitle || ''}
+                            onChange={(e) => updateField('headerTitle', e.target.value)}
+                            placeholder="Laissez vide pour utiliser le nom du widget"
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Reviews design */}
+                  {editForm.layout !== 'badge' && (
+                    <div className="border-t border-gray-100 pt-4">
+                      <p className="text-xs font-semibold text-gray-700 mb-3">Design des avis</p>
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <label className="text-sm text-gray-600">Afficher les avatars</label>
+                          <Toggle checked={editForm.showAvatar !== false} onChange={v => updateField('showAvatar', v)} />
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <label className="text-sm text-gray-600">Afficher la date</label>
+                          <Toggle checked={editForm.showDate !== false} onChange={v => updateField('showDate', v)} />
+                        </div>
+                        {(editForm.layout === 'list' || editForm.layout === 'grid' || editForm.layout === 'slider') && (
+                          <div className="flex items-center justify-between">
+                            <label className="text-sm text-gray-600">Tronquer le texte long</label>
+                            <Toggle checked={editForm.truncateText !== false} onChange={v => updateField('truncateText', v)} />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Filters (shared) */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">Avis max</label>
@@ -410,83 +589,17 @@ export default function WidgetDetail() {
                 </div>
               </div>
 
-              {/* Theme + color */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">Thème</label>
-                  <select
-                    value={editForm.theme}
-                    onChange={(e) => updateField('theme', e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  >
-                    <option value="light">Clair</option>
-                    <option value="dark">Sombre</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">Couleur accent</label>
-                  <div className="flex gap-2">
-                    <input
-                      type="color"
-                      value={editForm.accentColor}
-                      onChange={(e) => updateField('accentColor', e.target.value)}
-                      className="h-9 w-10 border border-gray-300 rounded-lg cursor-pointer p-0.5"
-                    />
-                    <input
-                      type="text"
-                      value={editForm.accentColor}
-                      onChange={(e) => updateField('accentColor', e.target.value)}
-                      className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
-                    />
-                  </div>
-                </div>
+              {/* Language (shared) */}
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Langue des avis</label>
+                <select
+                  value={editForm.language || 'fr'}
+                  onChange={(e) => updateField('language', e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  {LANGUAGES.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
+                </select>
               </div>
-
-              {/* Header design */}
-              <div className="border-t border-gray-100 pt-4">
-                <p className="text-xs font-semibold text-gray-700 mb-3">En-tête</p>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <label className="text-sm text-gray-600">Afficher l'en-tête</label>
-                    <Toggle checked={editForm.showHeader !== false} onChange={v => updateField('showHeader', v)} />
-                  </div>
-                  {editForm.showHeader !== false && (
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Titre personnalisé</label>
-                      <input
-                        type="text"
-                        value={editForm.headerTitle || ''}
-                        onChange={(e) => updateField('headerTitle', e.target.value)}
-                        placeholder="Laissez vide pour utiliser le nom du widget"
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      />
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Reviews design */}
-              {editForm.layout !== 'badge' && (
-                <div className="border-t border-gray-100 pt-4">
-                  <p className="text-xs font-semibold text-gray-700 mb-3">Design des avis</p>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <label className="text-sm text-gray-600">Afficher les avatars</label>
-                      <Toggle checked={editForm.showAvatar !== false} onChange={v => updateField('showAvatar', v)} />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <label className="text-sm text-gray-600">Afficher la date</label>
-                      <Toggle checked={editForm.showDate !== false} onChange={v => updateField('showDate', v)} />
-                    </div>
-                    {(editForm.layout === 'list' || editForm.layout === 'grid' || editForm.layout === 'slider') && (
-                      <div className="flex items-center justify-between">
-                        <label className="text-sm text-gray-600">Tronquer le texte long</label>
-                        <Toggle checked={editForm.truncateText !== false} onChange={v => updateField('truncateText', v)} />
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
 
               {editError && (
                 <p className="text-red-500 text-sm bg-red-50 px-3 py-2 rounded-lg">{editError}</p>
@@ -516,10 +629,14 @@ export default function WidgetDetail() {
                   <dd className="text-gray-900 text-xs">{config.placeDescription}</dd>
                 </div>
               )}
-              <div>
-                <dt className="text-gray-500 text-xs mb-0.5">Mise en page</dt>
-                <dd className="text-gray-900">{layoutLabel[config.layout as string] || 'Liste'}</dd>
-              </div>
+              {!isWebhook && (
+                <>
+                  <div>
+                    <dt className="text-gray-500 text-xs mb-0.5">Mise en page</dt>
+                    <dd className="text-gray-900">{layoutLabel[config.layout as string] || 'Liste'}</dd>
+                  </div>
+                </>
+              )}
               <div>
                 <dt className="text-gray-500 text-xs mb-0.5">Avis max</dt>
                 <dd className="text-gray-900">{config.maxReviews}</dd>
@@ -529,30 +646,38 @@ export default function WidgetDetail() {
                 <dd className="text-gray-900">{config.minRating}★ et +</dd>
               </div>
               <div>
-                <dt className="text-gray-500 text-xs mb-0.5">Thème</dt>
-                <dd className="text-gray-900">{config.theme === 'dark' ? 'Sombre' : 'Clair'}</dd>
+                <dt className="text-gray-500 text-xs mb-0.5">Langue</dt>
+                <dd className="text-gray-900">{LANGUAGES.find(l => l.value === (config.language || 'fr'))?.label || 'Français'}</dd>
               </div>
-              <div className="flex items-center gap-2">
-                <div>
-                  <dt className="text-gray-500 text-xs mb-0.5">Couleur accent</dt>
-                  <dd className="flex items-center gap-2">
-                    <span className="inline-block w-4 h-4 rounded border border-gray-200" style={{ background: config.accentColor }} />
-                    <span className="text-gray-900 font-mono text-xs">{config.accentColor}</span>
-                  </dd>
-                </div>
-              </div>
-              <div>
-                <dt className="text-gray-500 text-xs mb-0.5">En-tête</dt>
-                <dd className="text-gray-900">{config.showHeader === false ? 'Masqué' : 'Affiché'}</dd>
-              </div>
-              <div>
-                <dt className="text-gray-500 text-xs mb-0.5">Avatars</dt>
-                <dd className="text-gray-900">{config.showAvatar === false ? 'Masqués' : 'Affichés'}</dd>
-              </div>
-              <div>
-                <dt className="text-gray-500 text-xs mb-0.5">Dates</dt>
-                <dd className="text-gray-900">{config.showDate === false ? 'Masquées' : 'Affichées'}</dd>
-              </div>
+              {!isWebhook && (
+                <>
+                  <div>
+                    <dt className="text-gray-500 text-xs mb-0.5">Thème</dt>
+                    <dd className="text-gray-900">{config.theme === 'dark' ? 'Sombre' : 'Clair'}</dd>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div>
+                      <dt className="text-gray-500 text-xs mb-0.5">Couleur accent</dt>
+                      <dd className="flex items-center gap-2">
+                        <span className="inline-block w-4 h-4 rounded border border-gray-200" style={{ background: config.accentColor }} />
+                        <span className="text-gray-900 font-mono text-xs">{config.accentColor}</span>
+                      </dd>
+                    </div>
+                  </div>
+                  <div>
+                    <dt className="text-gray-500 text-xs mb-0.5">En-tête</dt>
+                    <dd className="text-gray-900">{config.showHeader === false ? 'Masqué' : 'Affiché'}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-gray-500 text-xs mb-0.5">Avatars</dt>
+                    <dd className="text-gray-900">{config.showAvatar === false ? 'Masqués' : 'Affichés'}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-gray-500 text-xs mb-0.5">Dates</dt>
+                    <dd className="text-gray-900">{config.showDate === false ? 'Masquées' : 'Affichées'}</dd>
+                  </div>
+                </>
+              )}
             </dl>
           )}
         </div>

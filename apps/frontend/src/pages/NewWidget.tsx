@@ -34,6 +34,8 @@ export interface FormState {
   showAvatar: boolean;
   showDate: boolean;
   truncateText: boolean;
+  // Webhook
+  language: string;
 }
 
 export const FORM_DEFAULTS: Omit<FormState, 'name' | 'placeId' | 'placeName' | 'placeDescription'> = {
@@ -47,6 +49,7 @@ export const FORM_DEFAULTS: Omit<FormState, 'name' | 'placeId' | 'placeName' | '
   showAvatar: true,
   showDate: true,
   truncateText: true,
+  language: 'fr',
 };
 
 export const MOCK_REVIEWS: Review[] = [
@@ -63,7 +66,12 @@ export const LAYOUTS = [
   { value: 'badge', label: 'Badge', desc: 'Synthèse compacte' },
 ];
 
-const STEP_LABELS = ['Design', 'Localisation', 'Paramètres'];
+const LANGUAGES = [
+  { value: 'fr', label: 'Français' },
+  { value: 'en', label: 'English' },
+  { value: 'es', label: 'Español' },
+  { value: 'de', label: 'Deutsch' },
+];
 
 // --- Shared preview components ---
 
@@ -233,12 +241,52 @@ export function LivePreview({ reviews, layout, theme, accentColor, widgetName, s
   );
 }
 
+// --- Webhook info panel ---
+
+function WebhookInfoPanel({ apiUrl }: { apiUrl: string }) {
+  const mockResponse = {
+    widget: { id: 'abc123', name: 'Mon restaurant' },
+    reviews: [
+      {
+        author_name: 'Marie Dupont',
+        rating: 5,
+        text: 'Excellent service !',
+        profile_photo_url: 'https://…',
+        relative_time_description: 'il y a 2 semaines',
+      },
+    ],
+  };
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Endpoint</p>
+        <code className="block bg-gray-950 text-green-400 text-xs p-3 rounded-lg break-all">
+          GET {apiUrl}/widget/{'{'}{'{'}WIDGET_ID{'}'}{'}'}/reviews
+        </code>
+      </div>
+      <div>
+        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Exemple curl</p>
+        <pre className="bg-gray-950 text-green-400 text-xs p-3 rounded-lg overflow-x-auto whitespace-pre-wrap break-all">
+          {`curl "${apiUrl}/widget/{WIDGET_ID}/reviews"`}
+        </pre>
+      </div>
+      <div>
+        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Structure de la réponse</p>
+        <pre className="bg-gray-950 text-blue-300 text-xs p-3 rounded-lg overflow-x-auto">
+          {JSON.stringify(mockResponse, null, 2)}
+        </pre>
+      </div>
+    </div>
+  );
+}
+
 // --- Step indicator ---
 
-function StepIndicator({ current }: { current: number }) {
+function StepIndicator({ current, labels }: { current: number; labels: string[] }) {
   return (
     <div className="flex items-center justify-center gap-0 mb-8">
-      {STEP_LABELS.map((label, i) => {
+      {labels.map((label, i) => {
         const step = i + 1;
         const done = step < current;
         const active = step === current;
@@ -252,7 +300,7 @@ function StepIndicator({ current }: { current: number }) {
               </div>
               <span className={`text-xs mt-1 font-medium ${active ? 'text-indigo-600' : 'text-gray-400'}`}>{label}</span>
             </div>
-            {i < STEP_LABELS.length - 1 && (
+            {i < labels.length - 1 && (
               <div className={`w-16 h-0.5 mb-5 mx-1 transition-colors ${done ? 'bg-indigo-600' : 'bg-gray-200'}`} />
             )}
           </div>
@@ -278,6 +326,7 @@ export function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: 
 
 export default function NewWidget() {
   const navigate = useNavigate();
+  const [widgetTypeSelection, setWidgetTypeSelection] = useState<'widget' | 'webhook' | null>(null);
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -300,6 +349,12 @@ export default function NewWidget() {
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const apiUrl = import.meta.env.VITE_API_URL || window.location.origin;
+
+  const stepLabels = widgetTypeSelection === 'webhook'
+    ? ['Localisation', 'Paramètres']
+    : ['Design', 'Localisation', 'Paramètres'];
+
+  const maxStep = stepLabels.length;
 
   useEffect(() => {
     api.get('/api/widgets').then(({ data: widgets }) => {
@@ -360,9 +415,12 @@ export default function NewWidget() {
       .catch(() => {});
   }
 
+  // The Localisation step is step 2 for widget, step 1 for webhook
+  const localisationStep = widgetTypeSelection === 'webhook' ? 1 : 2;
+
   function nextStep() {
     setError('');
-    if (step === 2 && !form.placeId) {
+    if (step === localisationStep && !form.placeId) {
       setError('Veuillez sélectionner un lieu dans la liste.');
       return;
     }
@@ -373,10 +431,11 @@ export default function NewWidget() {
     setError('');
     setLoading(true);
     try {
+      const type = widgetTypeSelection === 'webhook' ? 'google_reviews_webhook' : 'google_reviews';
       const { name, placeName, ...config } = form;
       const { data } = await api.post('/api/widgets', {
         name: name || placeName,
-        type: 'google_reviews',
+        type,
         config,
       });
       navigate(`/widgets/${data.id}`);
@@ -400,20 +459,124 @@ export default function NewWidget() {
     truncateText: form.truncateText,
   };
 
+  // Localisation form block (shared between widget step 2 and webhook step 1)
+  const localisationBlock = (
+    <div className="space-y-4">
+      <div>
+        <h2 className="font-semibold text-gray-900 mb-1">Quel établissement ?</h2>
+        <p className="text-xs text-gray-400 mb-4">Recherchez votre établissement par son nom.</p>
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Lieu</label>
+        <div className="relative" ref={dropdownRef}>
+          <input
+            type="text"
+            value={search}
+            onChange={e => handleSearchChange(e.target.value)}
+            onFocus={() => suggestions.length > 0 && setShowDropdown(true)}
+            placeholder="Ex: Boulangerie Martin, Paris…"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            autoComplete="off"
+            autoFocus
+          />
+          {searching && <span className="absolute right-3 top-2.5 text-gray-400 text-xs">Recherche…</span>}
+          {showDropdown && (
+            <ul className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+              {suggestions.map(place => (
+                <li
+                  key={place.place_id}
+                  onMouseDown={() => selectPlace(place)}
+                  className="px-4 py-3 cursor-pointer hover:bg-indigo-50 border-b border-gray-100 last:border-0"
+                >
+                  <p className="text-sm font-medium text-gray-900">{place.main_text}</p>
+                  <p className="text-xs text-gray-400">{place.secondary_text}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        {form.placeId && (
+          <p className="text-xs text-green-600 mt-1">✓ {form.placeDescription}</p>
+        )}
+      </div>
+      {error && <p className="text-red-500 text-sm bg-red-50 px-3 py-2 rounded-lg">{error}</p>}
+    </div>
+  );
+
+  // --- Type selection screen ---
+  if (widgetTypeSelection === null) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <header className="bg-white border-b border-gray-200">
+          <div className="max-w-6xl mx-auto px-4 py-4 flex items-center gap-3">
+            <Link to="/" className="text-gray-400 hover:text-gray-600 text-lg leading-none">←</Link>
+            <div>
+              <h1 className="text-lg font-bold text-gray-900">Nouveau widget</h1>
+              <p className="text-xs text-gray-400">Choisissez un type</p>
+            </div>
+          </div>
+        </header>
+        <main className="max-w-6xl mx-auto px-4 py-16">
+          <h2 className="text-xl font-semibold text-gray-900 text-center mb-2">Quel type de widget ?</h2>
+          <p className="text-sm text-gray-400 text-center mb-10">Choisissez selon votre mode d'intégration.</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-2xl mx-auto">
+            <button
+              type="button"
+              onClick={() => setWidgetTypeSelection('widget')}
+              className="text-left bg-white rounded-2xl border-2 border-gray-200 p-6 hover:border-indigo-400 hover:shadow-md transition-all group"
+            >
+              <div className="text-3xl mb-3">⭐</div>
+              <h3 className="font-semibold text-gray-900 mb-1 group-hover:text-indigo-600 transition-colors">Avis Google — Widget</h3>
+              <p className="text-xs text-gray-500 mb-3">Snippet HTML à coller dans votre site. Design personnalisable en 3 étapes.</p>
+              <ul className="text-xs text-gray-400 space-y-1">
+                <li>✓ Mise en page (liste, grille, slider…)</li>
+                <li>✓ Thème clair / sombre</li>
+                <li>✓ Aperçu en temps réel</li>
+              </ul>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setWidgetTypeSelection('webhook')}
+              className="text-left bg-white rounded-2xl border-2 border-gray-200 p-6 hover:border-indigo-400 hover:shadow-md transition-all group"
+            >
+              <div className="text-3xl mb-3">🔗</div>
+              <h3 className="font-semibold text-gray-900 mb-1 group-hover:text-indigo-600 transition-colors">Avis Google — Webhook</h3>
+              <p className="text-xs text-gray-500 mb-3">URL API JSON brute. Pour intégration personnalisée côté développeur, en 2 étapes.</p>
+              <ul className="text-xs text-gray-400 space-y-1">
+                <li>✓ Endpoint JSON REST</li>
+                <li>✓ Aucun HTML imposé</li>
+                <li>✓ Contrôle total de l'affichage</li>
+              </ul>
+            </button>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  const isWidget = widgetTypeSelection === 'widget';
+
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-200">
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center gap-3">
-          <Link to="/" className="text-gray-400 hover:text-gray-600 text-lg leading-none">←</Link>
+          <button
+            type="button"
+            onClick={() => { setWidgetTypeSelection(null); setStep(1); setError(''); }}
+            className="text-gray-400 hover:text-gray-600 text-lg leading-none"
+          >
+            ←
+          </button>
           <div>
             <h1 className="text-lg font-bold text-gray-900">Nouveau widget</h1>
-            <p className="text-xs text-gray-400">Avis Google</p>
+            <p className="text-xs text-gray-400">{isWidget ? 'Avis Google — Widget' : 'Avis Google — Webhook'}</p>
           </div>
         </div>
       </header>
 
       <main className="max-w-6xl mx-auto px-4 py-8">
-        <StepIndicator current={step} />
+        <StepIndicator current={step} labels={stepLabels} />
 
         <div className="flex flex-col xl:flex-row gap-6 items-start">
 
@@ -421,8 +584,8 @@ export default function NewWidget() {
           <div className="w-full xl:flex-1 min-w-0">
             <div className="bg-white rounded-xl border border-gray-200 p-6">
 
-              {/* Étape 1 — Design */}
-              {step === 1 && (
+              {/* Widget: Étape 1 — Design */}
+              {isWidget && step === 1 && (
                 <div className="space-y-6">
                   {/* Layout */}
                   <div>
@@ -531,52 +694,11 @@ export default function NewWidget() {
                 </div>
               )}
 
-              {/* Étape 2 — Localisation */}
-              {step === 2 && (
-                <div className="space-y-4">
-                  <div>
-                    <h2 className="font-semibold text-gray-900 mb-1">Quel établissement ?</h2>
-                    <p className="text-xs text-gray-400 mb-4">Recherchez votre établissement par son nom.</p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Lieu</label>
-                    <div className="relative" ref={dropdownRef}>
-                      <input
-                        type="text"
-                        value={search}
-                        onChange={e => handleSearchChange(e.target.value)}
-                        onFocus={() => suggestions.length > 0 && setShowDropdown(true)}
-                        placeholder="Ex: Boulangerie Martin, Paris…"
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                        autoComplete="off"
-                        autoFocus
-                      />
-                      {searching && <span className="absolute right-3 top-2.5 text-gray-400 text-xs">Recherche…</span>}
-                      {showDropdown && (
-                        <ul className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
-                          {suggestions.map(place => (
-                            <li
-                              key={place.place_id}
-                              onMouseDown={() => selectPlace(place)}
-                              className="px-4 py-3 cursor-pointer hover:bg-indigo-50 border-b border-gray-100 last:border-0"
-                            >
-                              <p className="text-sm font-medium text-gray-900">{place.main_text}</p>
-                              <p className="text-xs text-gray-400">{place.secondary_text}</p>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                    {form.placeId && (
-                      <p className="text-xs text-green-600 mt-1">✓ {form.placeDescription}</p>
-                    )}
-                  </div>
-                  {error && <p className="text-red-500 text-sm bg-red-50 px-3 py-2 rounded-lg">{error}</p>}
-                </div>
-              )}
+              {/* Localisation step (widget step 2 OR webhook step 1) */}
+              {step === localisationStep && localisationBlock}
 
-              {/* Étape 3 — Paramètres */}
-              {step === 3 && (
+              {/* Paramètres step (widget step 3 OR webhook step 2) */}
+              {((isWidget && step === 3) || (!isWidget && step === 2)) && (
                 <div className="space-y-5">
                   <div>
                     <h2 className="font-semibold text-gray-900 mb-1">Paramètres</h2>
@@ -618,6 +740,20 @@ export default function NewWidget() {
                     </div>
                   </div>
 
+                  {/* Language — webhook only */}
+                  {!isWidget && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Langue des avis</label>
+                      <select
+                        value={form.language}
+                        onChange={e => update('language', e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      >
+                        {LANGUAGES.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
+                      </select>
+                    </div>
+                  )}
+
                   {error && <p className="text-red-500 text-sm bg-red-50 px-3 py-2 rounded-lg">{error}</p>}
                 </div>
               )}
@@ -629,10 +765,16 @@ export default function NewWidget() {
                     ← Précédent
                   </button>
                 ) : (
-                  <Link to="/" className="text-sm text-gray-500 hover:text-gray-700">Annuler</Link>
+                  <button
+                    type="button"
+                    onClick={() => { setWidgetTypeSelection(null); setStep(1); setError(''); }}
+                    className="text-sm text-gray-500 hover:text-gray-700"
+                  >
+                    Annuler
+                  </button>
                 )}
 
-                {step < 3 ? (
+                {step < maxStep ? (
                   <button
                     type="button"
                     onClick={nextStep}
@@ -647,7 +789,7 @@ export default function NewWidget() {
                     disabled={loading}
                     className="bg-indigo-600 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors"
                   >
-                    {loading ? 'Création…' : 'Créer le widget'}
+                    {loading ? 'Création…' : isWidget ? 'Créer le widget' : 'Créer le webhook'}
                   </button>
                 )}
               </div>
@@ -657,10 +799,21 @@ export default function NewWidget() {
           {/* Right: sticky preview (xl screens) */}
           <div className="hidden xl:block xl:w-96 flex-shrink-0">
             <div className="sticky top-6">
-              <p className="text-xs text-gray-500 mb-3 font-medium uppercase tracking-wide">Aperçu en temps réel</p>
-              <div className="bg-gray-100 rounded-xl p-5 border border-dashed border-gray-300">
-                <LivePreview {...previewProps} />
-              </div>
+              {isWidget ? (
+                <>
+                  <p className="text-xs text-gray-500 mb-3 font-medium uppercase tracking-wide">Aperçu en temps réel</p>
+                  <div className="bg-gray-100 rounded-xl p-5 border border-dashed border-gray-300">
+                    <LivePreview {...previewProps} />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="text-xs text-gray-500 mb-3 font-medium uppercase tracking-wide">Endpoint JSON</p>
+                  <div className="bg-white rounded-xl border border-gray-200 p-5">
+                    <WebhookInfoPanel apiUrl={apiUrl} />
+                  </div>
+                </>
+              )}
             </div>
           </div>
 

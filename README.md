@@ -115,6 +115,41 @@ Après avoir créé un widget dans le dashboard, copiez le snippet fourni :
 <script src="https://votre-app.com/widget.js" data-widget-id="VOTRE_ID"></script>
 ```
 
+### Avis Google — Webhook
+
+Le type **Webhook JSON** expose les avis via un endpoint JSON brut, sans interface HTML. Idéal pour une intégration personnalisée côté développeur.
+
+**Endpoint :**
+
+```
+GET https://votre-app.com/widget/VOTRE_ID/reviews
+```
+
+**Exemple curl :**
+
+```bash
+curl "https://votre-app.com/widget/VOTRE_ID/reviews"
+```
+
+**Structure de la réponse :**
+
+```json
+{
+  "widget": { "id": "…", "name": "…" },
+  "reviews": [
+    {
+      "author_name": "Marie Dupont",
+      "rating": 5,
+      "text": "Excellent service !",
+      "profile_photo_url": "https://…",
+      "relative_time_description": "il y a 2 semaines"
+    }
+  ]
+}
+```
+
+Le même endpoint `/widget/:id/reviews` est utilisé par le widget HTML embarqué et par le type Webhook — c'est l'usage qui diffère.
+
 ---
 
 ## Architecture
