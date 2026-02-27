@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth';
-import { searchPlaces } from '../lib/google';
+import { searchPlaces, fetchGoogleReviews } from '../lib/google';
 
 const router = Router();
 
@@ -15,6 +15,25 @@ router.get('/search', async (req, res) => {
   try {
     const results = await searchPlaces(q.trim());
     res.json(results);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/reviews', async (req, res) => {
+  const placeId = req.query.placeId as string;
+  if (!placeId) {
+    res.status(400).json({ error: 'Paramètre placeId requis.' });
+    return;
+  }
+  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+  if (!apiKey) {
+    res.status(500).json({ error: 'GOOGLE_MAPS_API_KEY non configurée.' });
+    return;
+  }
+  try {
+    const reviews = await fetchGoogleReviews(placeId, apiKey, 'fr');
+    res.json(reviews);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
