@@ -92,7 +92,9 @@ function CardHeader({ review, isDark, showAvatar, avatarSize = 36 }: {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
       {showAvatar && (
-        <div style={{ width: avatarSize, height: avatarSize, borderRadius: '50%', background: isDark ? '#374151' : '#E5E7EB', flexShrink: 0 }} />
+        review.profile_photo_url
+          ? <img src={review.profile_photo_url} alt="" style={{ width: avatarSize, height: avatarSize, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+          : <div style={{ width: avatarSize, height: avatarSize, borderRadius: '50%', background: isDark ? '#374151' : '#E5E7EB', flexShrink: 0 }} />
       )}
       <div>
         <div style={{ fontWeight: 600, fontSize: avatarSize === 32 ? 13 : 14, color: textColor }}>{review.author_name}</div>
@@ -140,7 +142,11 @@ function ReviewCardStars({ review, isDark, showAvatar, showDate }: {
   const subColor = isDark ? '#9CA3AF' : '#6B7280';
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: `1px solid ${border}` }}>
-      {showAvatar && <div style={{ width: 32, height: 32, borderRadius: '50%', background: isDark ? '#374151' : '#E5E7EB', flexShrink: 0 }} />}
+      {showAvatar && (
+        review.profile_photo_url
+          ? <img src={review.profile_photo_url} alt="" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+          : <div style={{ width: 32, height: 32, borderRadius: '50%', background: isDark ? '#374151' : '#E5E7EB', flexShrink: 0 }} />
+      )}
       <span style={{ fontWeight: 600, fontSize: 14, color: textColor, flex: 1 }}>{review.author_name}</span>
       <StarRating rating={review.rating} />
       {showDate && review.relative_time_description && <span style={{ fontSize: 12, color: subColor, whiteSpace: 'nowrap' }}>{review.relative_time_description}</span>}
@@ -191,8 +197,6 @@ export function LivePreview({ reviews, layout, theme, accentColor, widgetName, s
   showHeader: boolean; headerTitle: string; showAvatar: boolean; showDate: boolean; truncateText: boolean;
 }) {
   const isDark = theme === 'dark';
-  const bg = isDark ? '#1F2937' : '#FFFFFF';
-  const border = isDark ? '#374151' : '#E5E7EB';
   const subColor = isDark ? '#9CA3AF' : '#6B7280';
   const title = headerTitle || widgetName;
 
@@ -221,7 +225,7 @@ export function LivePreview({ reviews, layout, theme, accentColor, widgetName, s
   }
 
   return (
-    <div style={{ fontFamily: 'system-ui,-apple-system,sans-serif', background: bg, borderRadius: 12, padding: 24, border: `1px solid ${border}` }}>
+    <div style={{ fontFamily: 'system-ui,-apple-system,sans-serif' }}>
       {showHeader && <h3 style={{ color: accentColor, margin: '0 0 20px', fontSize: 18, fontWeight: 700 }}>{title}</h3>}
       {renderReviews()}
       <div style={{ textAlign: 'center', marginTop: 16, fontSize: 11, color: subColor }}>Powered by WebWidget</div>
@@ -517,7 +521,9 @@ export default function NewWidget() {
                   {/* Mobile preview */}
                   <div className="xl:hidden border-t border-gray-100 pt-5">
                     <p className="text-xs text-gray-500 mb-3 font-medium uppercase tracking-wide">Aperçu</p>
-                    <LivePreview {...previewProps} />
+                    <div className="bg-gray-100 rounded-xl p-5 border border-dashed border-gray-300">
+                      <LivePreview {...previewProps} />
+                    </div>
                   </div>
                 </div>
               )}
@@ -649,7 +655,9 @@ export default function NewWidget() {
           <div className="hidden xl:block xl:w-96 flex-shrink-0">
             <div className="sticky top-6">
               <p className="text-xs text-gray-500 mb-3 font-medium uppercase tracking-wide">Aperçu en temps réel</p>
-              <LivePreview {...previewProps} />
+              <div className="bg-gray-100 rounded-xl p-5 border border-dashed border-gray-300">
+                <LivePreview {...previewProps} />
+              </div>
             </div>
           </div>
 
