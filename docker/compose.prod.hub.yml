@@ -1,9 +1,15 @@
 # =============================================================================
-# Production — single all-in-one image
+# Production — images pré-buildées depuis Docker Hub
+#
+# Utilise les images publiées par le workflow CI (docker-publish.yml).
+# Aucun build local requis.
 #
 # Usage:
 #   cp .env.example .env.prod   # fill in all required variables
-#   docker compose -f docker-compose.prod.yml --env-file .env.prod up --build -d
+#   docker compose -f docker/compose.prod.hub.yml --env-file .env.prod up -d
+#
+# Note: VITE_API_URL est baked dans l'image frontend au moment du build CI.
+# Elle doit correspondre à l'URL publique de votre backend.
 #
 # The app is reachable on http://host:${PORT:-3000}
 # Put a reverse proxy (Nginx, Caddy, Traefik…) in front for HTTPS.
@@ -25,12 +31,10 @@ services:
       retries: 5
     restart: unless-stopped
 
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+  backend:
+    image: ${DOCKERHUB_USERNAME:?DOCKERHUB_USERNAME is required}/web-widget-tool-backend:latest
     ports:
-      - "${PORT:-3000}:4000"
+      - "${PORT:-4000}:4000"
     environment:
       DATABASE_URL:               postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/widgets
       ADMIN_EMAIL:                ${ADMIN_EMAIL:?ADMIN_EMAIL is required}
@@ -38,8 +42,7 @@ services:
       JWT_SECRET:                 ${JWT_SECRET:?JWT_SECRET is required}
       GOOGLE_MAPS_API_KEY:        ${GOOGLE_MAPS_API_KEY}
       GOOGLE_REVIEWS_CACHE_TTL:   ${GOOGLE_REVIEWS_CACHE_TTL:-604800}
-      # FRONTEND_URL must match the public URL of the app (for CORS on embedded widgets)
-      FRONTEND_URL:               ${APP_URL:-http://localhost:3000}
+      FRONTEND_URL:               ${APP_URL:?APP_URL is required}
     depends_on:
       postgres:
         condition: service_healthy
@@ -49,6 +52,14 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+
+  frontend:
+    image: ${DOCKERHUB_USERNAME}/web-widget-tool-frontend:latest
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
 
 volumes:
   postgres_data:

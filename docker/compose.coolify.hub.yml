@@ -1,15 +1,18 @@
 # =============================================================================
-# Coolify deployment — all-in-one image
+# Coolify deployment — images pré-buildées depuis Docker Hub
+#
+# Utilise les images publiées par le workflow CI (docker-publish.yml).
+# Aucun build local requis.
 #
 # How to deploy on Coolify:
 #   1. Create a new "Docker Compose" resource in Coolify.
-#   2. Point it to this file (docker-compose.coolify.yml).
+#   2. Point it to this file (docker/compose.coolify.hub.yml).
 #   3. Set the environment variables listed below in the Coolify UI.
-#   4. Coolify will automatically assign a domain to the `app` service
-#      and inject SERVICE_FQDN_APP_4000 into the environment.
+#   4. Coolify will automatically assign a domain to the `frontend` service
+#      and inject SERVICE_FQDN_FRONTEND_80 into the environment.
 #
-# The ${SERVICE_FQDN_APP_4000} variable is provided by Coolify and resolves
-# to the public HTTPS URL assigned to port 4000 of the `app` service.
+# Note: VITE_API_URL est baked dans l'image frontend au moment du build CI.
+# Elle doit correspondre à l'URL publique de votre backend.
 # =============================================================================
 
 services:
@@ -28,10 +31,8 @@ services:
       retries: 5
     restart: unless-stopped
 
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+  backend:
+    image: ${DOCKERHUB_USERNAME}/web-widget-tool-backend:latest
     # No `ports` here — Coolify handles ingress and TLS termination.
     expose:
       - "4000"
@@ -42,8 +43,8 @@ services:
       JWT_SECRET:               ${JWT_SECRET}
       GOOGLE_MAPS_API_KEY:      ${GOOGLE_MAPS_API_KEY}
       GOOGLE_REVIEWS_CACHE_TTL: ${GOOGLE_REVIEWS_CACHE_TTL:-604800}
-      # Coolify injects the public URL as SERVICE_FQDN_APP_4000
-      FRONTEND_URL:             ${SERVICE_FQDN_APP_4000}
+      # Coolify injects the public URL — must match VITE_API_URL baked in the frontend image
+      FRONTEND_URL:             ${SERVICE_FQDN_BACKEND_4000}
     depends_on:
       postgres:
         condition: service_healthy
@@ -53,6 +54,15 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+
+  frontend:
+    image: ${DOCKERHUB_USERNAME}/web-widget-tool-frontend:latest
+    # No `ports` here — Coolify handles ingress and TLS termination.
+    expose:
+      - "80"
+    depends_on:
+      - backend
+    restart: unless-stopped
 
 volumes:
   postgres_data:
