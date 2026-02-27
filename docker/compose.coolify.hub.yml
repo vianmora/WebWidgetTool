@@ -32,7 +32,7 @@ services:
     restart: unless-stopped
 
   backend:
-    image: ${DOCKERHUB_USERNAME}/web-widget-tool-backend:latest
+    image: vianmora/web-widget-tool-backend:latest
     # No `ports` here — Coolify handles ingress and TLS termination.
     expose:
       - "4000"
@@ -56,7 +56,7 @@ services:
       retries: 3
 
   frontend:
-    image: ${DOCKERHUB_USERNAME}/web-widget-tool-frontend:latest
+    image: vianmora/web-widget-tool-frontend:latest
     # No `ports` here — Coolify handles ingress and TLS termination.
     expose:
       - "80"

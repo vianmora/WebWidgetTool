@@ -32,7 +32,7 @@ services:
     restart: unless-stopped
 
   backend:
-    image: ${DOCKERHUB_USERNAME:?DOCKERHUB_USERNAME is required}/web-widget-tool-backend:latest
+    image: vianmora/web-widget-tool-backend:latest
     ports:
       - "${PORT:-4000}:4000"
     environment:
@@ -54,7 +54,7 @@ services:
       retries: 3
 
   frontend:
-    image: ${DOCKERHUB_USERNAME}/web-widget-tool-frontend:latest
+    image: vianmora/web-widget-tool-frontend:latest
     ports:
       - "${FRONTEND_PORT:-3000}:80"
     depends_on:
