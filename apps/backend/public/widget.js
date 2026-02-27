@@ -283,17 +283,12 @@
     var showDate = config.showDate !== false;
     var truncateText = config.truncateText !== false;
 
-    var bg = isDark ? '#1F2937' : '#FFFFFF';
-    var border = isDark ? '#374151' : '#E5E7EB';
     var subColor = isDark ? '#9CA3AF' : '#6B7280';
 
     container.innerHTML = '';
     container.style.fontFamily = 'system-ui,-apple-system,sans-serif';
 
-    var wrapper = createElement('div', [
-      'background:' + bg, 'border-radius:12px',
-      'padding:24px', 'border:1px solid ' + border,
-    ].join(';'));
+    var wrapper = createElement('div', 'border-radius:12px;padding:24px');
 
     if (showHeader) {
       var title = createElement('h3', 'color:' + accent + ';margin:0 0 20px;font-size:18px;font-weight:700');
