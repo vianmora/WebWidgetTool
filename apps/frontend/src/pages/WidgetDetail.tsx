@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import api from '../lib/api';
+import { LivePreview, StarRating, Toggle, LAYOUTS, FORM_DEFAULTS } from './NewWidget';
 
 interface Review {
   author_name: string;
@@ -11,7 +12,20 @@ interface Review {
 }
 
 interface PreviewData {
-  widget: { id: string; name: string; config: { theme: string; accentColor: string; layout: string } };
+  widget: {
+    id: string;
+    name: string;
+    config: {
+      theme: string;
+      accentColor: string;
+      layout: string;
+      showHeader: boolean;
+      headerTitle: string;
+      showAvatar: boolean;
+      showDate: boolean;
+      truncateText: boolean;
+    };
+  };
   reviews: Review[];
 }
 
@@ -28,90 +42,6 @@ interface PlacePrediction {
   description: string;
   main_text: string;
   secondary_text: string;
-}
-
-function StarRating({ rating }: { rating: number }) {
-  return (
-    <span>
-      {[1, 2, 3, 4, 5].map((i) => (
-        <span key={i} style={{ color: i <= rating ? '#FBBF24' : '#D1D5DB' }}>★</span>
-      ))}
-    </span>
-  );
-}
-
-function ReviewCard({ review, isDark }: { review: Review; isDark: boolean }) {
-  const bg = isDark ? '#111827' : '#F9FAFB';
-  const border = isDark ? '#374151' : '#E5E7EB';
-  const textColor = isDark ? '#F9FAFB' : '#111827';
-  const subColor = isDark ? '#9CA3AF' : '#6B7280';
-
-  return (
-    <div style={{ padding: 16, background: bg, borderRadius: 8, border: `1px solid ${border}`, marginBottom: 12 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-        {review.profile_photo_url && (
-          <img
-            src={review.profile_photo_url}
-            alt={review.author_name}
-            style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
-            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-          />
-        )}
-        <div>
-          <div style={{ fontWeight: 600, fontSize: 14, color: textColor }}>{review.author_name}</div>
-          <StarRating rating={review.rating} />
-        </div>
-      </div>
-      {review.text && (
-        <p style={{ color: subColor, margin: 0, fontSize: 14, lineHeight: 1.6 }}>{review.text}</p>
-      )}
-      {review.relative_time_description && (
-        <div style={{ color: subColor, fontSize: 12, marginTop: 8 }}>{review.relative_time_description}</div>
-      )}
-    </div>
-  );
-}
-
-function ReviewCardGrid({ review, isDark }: { review: Review; isDark: boolean }) {
-  const bg = isDark ? '#111827' : '#F9FAFB';
-  const border = isDark ? '#374151' : '#E5E7EB';
-  const textColor = isDark ? '#F9FAFB' : '#111827';
-  const subColor = isDark ? '#9CA3AF' : '#6B7280';
-  return (
-    <div style={{ padding: 16, background: bg, borderRadius: 8, border: `1px solid ${border}`, display: 'flex', flexDirection: 'column' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-        {review.profile_photo_url && (
-          <img src={review.profile_photo_url} alt={review.author_name}
-            style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
-            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-        )}
-        <div>
-          <div style={{ fontWeight: 600, fontSize: 13, color: textColor }}>{review.author_name}</div>
-          <StarRating rating={review.rating} />
-        </div>
-      </div>
-      {review.text && <p style={{ color: subColor, margin: 0, fontSize: 13, lineHeight: 1.5, flex: 1 }}>{review.text}</p>}
-      {review.relative_time_description && <div style={{ color: subColor, fontSize: 11, marginTop: 8 }}>{review.relative_time_description}</div>}
-    </div>
-  );
-}
-
-function ReviewCardStars({ review, isDark }: { review: Review; isDark: boolean }) {
-  const border = isDark ? '#374151' : '#E5E7EB';
-  const textColor = isDark ? '#F9FAFB' : '#111827';
-  const subColor = isDark ? '#9CA3AF' : '#6B7280';
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: `1px solid ${border}` }}>
-      {review.profile_photo_url && (
-        <img src={review.profile_photo_url} alt={review.author_name}
-          style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
-          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-      )}
-      <span style={{ fontWeight: 600, fontSize: 14, color: textColor, flex: 1 }}>{review.author_name}</span>
-      <StarRating rating={review.rating} />
-      {review.relative_time_description && <span style={{ fontSize: 12, color: subColor, whiteSpace: 'nowrap' }}>{review.relative_time_description}</span>}
-    </div>
-  );
 }
 
 function WidgetPreview({ widgetId, apiUrl, refreshKey }: { widgetId: string; apiUrl: string; refreshKey: number }) {
@@ -136,34 +66,21 @@ function WidgetPreview({ widgetId, apiUrl, refreshKey }: { widgetId: string; api
   if (error) return <p className="text-sm text-red-500 text-center py-4">Erreur : {error}</p>;
   if (!data) return null;
 
-  const { theme, accentColor, layout } = data.widget.config;
-  const reviews = data.reviews;
-  const isDark = theme === 'dark';
-  const bg = isDark ? '#1F2937' : '#FFFFFF';
-  const border = isDark ? '#374151' : '#E5E7EB';
-  const subColor = isDark ? '#9CA3AF' : '#6B7280';
-
-  function renderReviews() {
-    if (reviews.length === 0) return <p style={{ color: subColor }}>Aucun avis disponible.</p>;
-    if (layout === 'grid') {
-      return (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          {reviews.map((r, i) => <ReviewCardGrid key={i} review={r} isDark={isDark} />)}
-        </div>
-      );
-    }
-    if (layout === 'stars') {
-      return <div>{reviews.map((r, i) => <ReviewCardStars key={i} review={r} isDark={isDark} />)}</div>;
-    }
-    return <div>{reviews.map((r, i) => <ReviewCard key={i} review={r} isDark={isDark} />)}</div>;
-  }
+  const c = data.widget.config;
 
   return (
-    <div style={{ fontFamily: 'system-ui,-apple-system,sans-serif', background: bg, borderRadius: 12, padding: 24, border: `1px solid ${border}` }}>
-      <h3 style={{ color: accentColor, margin: '0 0 20px', fontSize: 18, fontWeight: 700 }}>{data.widget.name}</h3>
-      {renderReviews()}
-      <div style={{ textAlign: 'center', marginTop: 16, fontSize: 11, color: subColor }}>Powered by WebWidget</div>
-    </div>
+    <LivePreview
+      reviews={data.reviews}
+      layout={c.layout || 'list'}
+      theme={c.theme || 'light'}
+      accentColor={c.accentColor || '#4F46E5'}
+      widgetName={data.widget.name}
+      showHeader={c.showHeader !== false}
+      headerTitle={c.headerTitle || ''}
+      showAvatar={c.showAvatar !== false}
+      showDate={c.showDate !== false}
+      truncateText={c.truncateText !== false}
+    />
   );
 }
 
@@ -208,18 +125,23 @@ export default function WidgetDetail() {
 
   function startEditing() {
     if (!widget) return;
-    const config = widget.config as any;
+    const c = widget.config as any;
     setEditForm({
       name: widget.name,
-      placeId: config.placeId,
-      placeDescription: config.placeDescription || '',
-      layout: config.layout || 'list',
-      maxReviews: config.maxReviews,
-      minRating: config.minRating,
-      theme: config.theme,
-      accentColor: config.accentColor,
+      placeId: c.placeId,
+      placeDescription: c.placeDescription || '',
+      layout: c.layout || 'list',
+      maxReviews: c.maxReviews ?? FORM_DEFAULTS.maxReviews,
+      minRating: c.minRating ?? FORM_DEFAULTS.minRating,
+      theme: c.theme || FORM_DEFAULTS.theme,
+      accentColor: c.accentColor || FORM_DEFAULTS.accentColor,
+      showHeader: c.showHeader !== false,
+      headerTitle: c.headerTitle || '',
+      showAvatar: c.showAvatar !== false,
+      showDate: c.showDate !== false,
+      truncateText: c.truncateText !== false,
     });
-    setSearch(config.placeDescription || '');
+    setSearch(c.placeDescription || '');
     setEditing(true);
     setEditError('');
   }
@@ -309,6 +231,24 @@ export default function WidgetDetail() {
 
   const config = widget.config as any;
 
+  const layoutLabel: Record<string, string> = {
+    list: 'Liste', grid: 'Grille', stars: 'Étoiles', slider: 'Slider', badge: 'Badge',
+  };
+
+  // Live preview props for edit mode
+  const editPreviewProps = editing ? {
+    reviews: [],
+    layout: editForm.layout || 'list',
+    theme: editForm.theme || 'light',
+    accentColor: editForm.accentColor || '#4F46E5',
+    widgetName: editForm.name || widget.name,
+    showHeader: editForm.showHeader !== false,
+    headerTitle: editForm.headerTitle || '',
+    showAvatar: editForm.showAvatar !== false,
+    showDate: editForm.showDate !== false,
+    truncateText: editForm.truncateText !== false,
+  } : null;
+
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-200">
@@ -376,7 +316,9 @@ export default function WidgetDetail() {
           </div>
 
           {editing ? (
-            <div className="space-y-4">
+            <div className="space-y-5">
+
+              {/* Nom */}
               <div>
                 <label className="block text-xs text-gray-500 mb-1">Nom du widget</label>
                 <input
@@ -387,6 +329,7 @@ export default function WidgetDetail() {
                 />
               </div>
 
+              {/* Lieu */}
               <div>
                 <label className="block text-xs text-gray-500 mb-1">Lieu</label>
                 <div className="relative" ref={dropdownRef}>
@@ -422,19 +365,16 @@ export default function WidgetDetail() {
                 )}
               </div>
 
+              {/* Layout */}
               <div>
-                <label className="block text-xs text-gray-500 mb-2">Design</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {[
-                    { value: 'list', label: 'Liste' },
-                    { value: 'grid', label: 'Grille' },
-                    { value: 'stars', label: 'Étoiles' },
-                  ].map((l) => (
+                <label className="block text-xs text-gray-500 mb-2">Mise en page</label>
+                <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                  {LAYOUTS.map((l) => (
                     <button
                       key={l.value}
                       type="button"
                       onClick={() => updateField('layout', l.value)}
-                      className={`py-2 rounded-lg border-2 text-xs font-medium transition-all ${
+                      className={`p-2 rounded-lg border-2 text-xs font-medium transition-all ${
                         editForm.layout === l.value
                           ? 'border-indigo-500 bg-indigo-50 text-indigo-600'
                           : 'border-gray-200 text-gray-500 hover:border-gray-300'
@@ -446,6 +386,7 @@ export default function WidgetDetail() {
                 </div>
               </div>
 
+              {/* Filters */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">Avis max</label>
@@ -469,6 +410,7 @@ export default function WidgetDetail() {
                 </div>
               </div>
 
+              {/* Theme + color */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">Thème</label>
@@ -500,6 +442,52 @@ export default function WidgetDetail() {
                 </div>
               </div>
 
+              {/* Header design */}
+              <div className="border-t border-gray-100 pt-4">
+                <p className="text-xs font-semibold text-gray-700 mb-3">En-tête</p>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm text-gray-600">Afficher l'en-tête</label>
+                    <Toggle checked={editForm.showHeader !== false} onChange={v => updateField('showHeader', v)} />
+                  </div>
+                  {editForm.showHeader !== false && (
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Titre personnalisé</label>
+                      <input
+                        type="text"
+                        value={editForm.headerTitle || ''}
+                        onChange={(e) => updateField('headerTitle', e.target.value)}
+                        placeholder="Laissez vide pour utiliser le nom du widget"
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Reviews design */}
+              {editForm.layout !== 'badge' && (
+                <div className="border-t border-gray-100 pt-4">
+                  <p className="text-xs font-semibold text-gray-700 mb-3">Design des avis</p>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm text-gray-600">Afficher les avatars</label>
+                      <Toggle checked={editForm.showAvatar !== false} onChange={v => updateField('showAvatar', v)} />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm text-gray-600">Afficher la date</label>
+                      <Toggle checked={editForm.showDate !== false} onChange={v => updateField('showDate', v)} />
+                    </div>
+                    {(editForm.layout === 'list' || editForm.layout === 'grid' || editForm.layout === 'slider') && (
+                      <div className="flex items-center justify-between">
+                        <label className="text-sm text-gray-600">Tronquer le texte long</label>
+                        <Toggle checked={editForm.truncateText !== false} onChange={v => updateField('truncateText', v)} />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {editError && (
                 <p className="text-red-500 text-sm bg-red-50 px-3 py-2 rounded-lg">{editError}</p>
               )}
@@ -529,12 +517,8 @@ export default function WidgetDetail() {
                 </div>
               )}
               <div>
-                <dt className="text-gray-500 text-xs mb-0.5">Place ID</dt>
-                <dd className="font-mono text-gray-900 text-xs truncate">{config.placeId}</dd>
-              </div>
-              <div>
-                <dt className="text-gray-500 text-xs mb-0.5">Design</dt>
-                <dd className="text-gray-900">{{ list: 'Liste', grid: 'Grille', stars: 'Étoiles' }[config.layout as string] || 'Liste'}</dd>
+                <dt className="text-gray-500 text-xs mb-0.5">Mise en page</dt>
+                <dd className="text-gray-900">{layoutLabel[config.layout as string] || 'Liste'}</dd>
               </div>
               <div>
                 <dt className="text-gray-500 text-xs mb-0.5">Avis max</dt>
@@ -552,13 +536,22 @@ export default function WidgetDetail() {
                 <div>
                   <dt className="text-gray-500 text-xs mb-0.5">Couleur accent</dt>
                   <dd className="flex items-center gap-2">
-                    <span
-                      className="inline-block w-4 h-4 rounded border border-gray-200"
-                      style={{ background: config.accentColor }}
-                    />
+                    <span className="inline-block w-4 h-4 rounded border border-gray-200" style={{ background: config.accentColor }} />
                     <span className="text-gray-900 font-mono text-xs">{config.accentColor}</span>
                   </dd>
                 </div>
+              </div>
+              <div>
+                <dt className="text-gray-500 text-xs mb-0.5">En-tête</dt>
+                <dd className="text-gray-900">{config.showHeader === false ? 'Masqué' : 'Affiché'}</dd>
+              </div>
+              <div>
+                <dt className="text-gray-500 text-xs mb-0.5">Avatars</dt>
+                <dd className="text-gray-900">{config.showAvatar === false ? 'Masqués' : 'Affichés'}</dd>
+              </div>
+              <div>
+                <dt className="text-gray-500 text-xs mb-0.5">Dates</dt>
+                <dd className="text-gray-900">{config.showDate === false ? 'Masquées' : 'Affichées'}</dd>
               </div>
             </dl>
           )}
