@@ -355,6 +355,9 @@ export default function NewWidget() {
     update('placeDescription', place.description);
     setSuggestions([]);
     setShowDropdown(false);
+    api.get('/api/places/reviews', { params: { placeId: place.place_id } })
+      .then(({ data }) => { if (data?.length > 0) setPreviewReviews(data); })
+      .catch(() => {});
   }
 
   function nextStep() {
