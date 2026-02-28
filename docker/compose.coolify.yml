@@ -4,50 +4,55 @@
 # Utilise l'image publiée par le workflow CI (docker-publish.yml).
 # Aucun build local requis.
 #
-# How to deploy on Coolify:
-#   1. Create a new "Docker Compose" resource in Coolify.
-#   2. Point it to this file (docker/compose.coolify.yml).
-#   3. Set ADMIN_EMAIL, POSTGRES_USER et GOOGLE_MAPS_API_KEY dans l'UI Coolify.
-#   4. Passwords et JWT_SECRET sont auto-générés par Coolify (SERVICE_PASSWORD_*).
-#   5. Coolify assigne un domaine au service `app` via SERVICE_FQDN_APP_4000.
+# Variables obligatoires à renseigner dans l'UI Coolify :
+#   - POSTGRES_USER
+#   - ADMIN_EMAIL
+#   - GOOGLE_MAPS_API_KEY
+# Les passwords sont auto-générés par Coolify (SERVICE_PASSWORD_*).
 # =============================================================================
 
 services:
   postgres:
-    image: postgres:16-alpine
+    image: 'postgres:16-alpine'
     environment:
-      POSTGRES_USER:     ${POSTGRES_USER:?POSTGRES_USER is required}
-      POSTGRES_PASSWORD: ${SERVICE_PASSWORD_POSTGRES}
-      POSTGRES_DB:       widgets
+      POSTGRES_USER: '${POSTGRES_USER:?POSTGRES_USER is required}'
+      POSTGRES_PASSWORD: '${SERVICE_PASSWORD_POSTGRES}'
+      POSTGRES_DB: widgets
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - 'postgres_data:/var/lib/postgresql/data'
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test:
+        - CMD-SHELL
+        - 'pg_isready -U ${POSTGRES_USER}'
       interval: 5s
       timeout: 5s
       retries: 5
     restart: unless-stopped
 
   app:
-    image: vianmora/web-widget-tool:latest
-    # No `ports` here — Coolify handles ingress and TLS termination.
+    image: 'vianmora/web-widget-tool:latest'
     expose:
-      - "4000"
+      - '4000'
     environment:
-      SERVICE_FQDN_APP_4000:    ""
-      DATABASE_URL:             postgresql://${POSTGRES_USER:?POSTGRES_USER is required}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/widgets
-      ADMIN_EMAIL:              ${ADMIN_EMAIL:?ADMIN_EMAIL is required}
-      ADMIN_PASSWORD:           ${SERVICE_PASSWORD_ADMIN}
-      JWT_SECRET:               ${SERVICE_PASSWORD_64_JWT}
-      GOOGLE_MAPS_API_KEY:      ${GOOGLE_MAPS_API_KEY:?GOOGLE_MAPS_API_KEY is required}
-      GOOGLE_REVIEWS_CACHE_TTL: ${GOOGLE_REVIEWS_CACHE_TTL:-604800}
-      FRONTEND_URL:             ${SERVICE_URL_APP_4000}
+      SERVICE_FQDN_APP_4000: ''
+      DATABASE_URL: 'postgresql://${POSTGRES_USER}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/widgets'
+      ADMIN_EMAIL: '${ADMIN_EMAIL:?ADMIN_EMAIL is required}'
+      ADMIN_PASSWORD: '${SERVICE_PASSWORD_ADMIN}'
+      JWT_SECRET: '${SERVICE_PASSWORD_64_JWT}'
+      GOOGLE_MAPS_API_KEY: '${GOOGLE_MAPS_API_KEY}'
+      GOOGLE_REVIEWS_CACHE_TTL: '${GOOGLE_REVIEWS_CACHE_TTL:-604800}'
+      FRONTEND_URL: '${SERVICE_URL_APP_4000}'
     depends_on:
       postgres:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:4000/health"]
+      test:
+        - CMD
+        - wget
+        - '-q'
+        - '--spider'
+        - 'http://localhost:4000/health'
       interval: 30s
       timeout: 10s
       retries: 3
