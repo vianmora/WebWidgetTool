@@ -65,4 +65,4 @@ COPY --from=frontend-builder /app/frontend/dist ./public/app
 
 EXPOSE 4000
 
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]
+CMD ["sh", "-c", "export DATABASE_URL=\"postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/widgets\" && npx prisma migrate deploy && node dist/index.js"]

@@ -35,8 +35,9 @@ services:
       - "4000"
     environment:
       SERVICE_FQDN_APP_4000:    ""
-      DATABASE_URL:             postgresql://${POSTGRES_USER:?postgres}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/widgets
-      ADMIN_EMAIL:              ${ADMIN_EMAIL:?}
+      POSTGRES_USER:            ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD:        ${SERVICE_PASSWORD_POSTGRES}
+      ADMIN_EMAIL:              ${ADMIN_EMAIL:?ADMIN_EMAIL is required}
       ADMIN_PASSWORD:           ${SERVICE_PASSWORD_ADMIN}
       JWT_SECRET:               ${SERVICE_PASSWORD_64_JWT}
       GOOGLE_MAPS_API_KEY:      ${GOOGLE_MAPS_API_KEY:}
