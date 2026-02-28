@@ -26,7 +26,6 @@ services:
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-changeme}
       JWT_SECRET: ${JWT_SECRET:-supersecretkey_change_in_production}
-      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY}
       GOOGLE_REVIEWS_CACHE_TTL: ${GOOGLE_REVIEWS_CACHE_TTL:-604800}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
     depends_on:
