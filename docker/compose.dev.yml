@@ -1,9 +1,5 @@
 name: web-widget-tool
 
-env_file:
-  - path: ../.env
-    required: false
-
 services:
   postgres:
     image: postgres:16-alpine
@@ -21,6 +17,8 @@ services:
 
   backend:
     build: ../apps/backend
+    env_file:
+      - ../.env
     ports:
       - "4000:4000"
     environment:
