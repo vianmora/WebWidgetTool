@@ -1,18 +1,15 @@
 # =============================================================================
-# Coolify deployment — images pré-buildées depuis Docker Hub
+# Coolify deployment — image pré-buildée depuis Docker Hub
 #
-# Utilise les images publiées par le workflow CI (docker-publish.yml).
+# Utilise l'image publiée par le workflow CI (docker-publish.yml).
 # Aucun build local requis.
 #
 # How to deploy on Coolify:
 #   1. Create a new "Docker Compose" resource in Coolify.
 #   2. Point it to this file (docker/compose.coolify.hub.yml).
 #   3. Set the environment variables listed below in the Coolify UI.
-#   4. Coolify will automatically assign a domain to the `frontend` service
-#      and inject SERVICE_FQDN_FRONTEND_80 into the environment.
-#
-# Note: VITE_API_URL est baked dans l'image frontend au moment du build CI.
-# Elle doit correspondre à l'URL publique de votre backend.
+#   4. Coolify will automatically assign a domain to the `app` service
+#      and inject SERVICE_FQDN_APP_4000 into the environment.
 # =============================================================================
 
 services:
@@ -31,8 +28,8 @@ services:
       retries: 5
     restart: unless-stopped
 
-  backend:
-    image: vianmora/web-widget-tool-backend:latest
+  app:
+    image: vianmora/web-widget-tool:latest
     # No `ports` here — Coolify handles ingress and TLS termination.
     expose:
       - "4000"
@@ -43,8 +40,7 @@ services:
       JWT_SECRET:               ${JWT_SECRET}
       GOOGLE_MAPS_API_KEY:      ${GOOGLE_MAPS_API_KEY}
       GOOGLE_REVIEWS_CACHE_TTL: ${GOOGLE_REVIEWS_CACHE_TTL:-604800}
-      # Coolify injects the public URL — must match VITE_API_URL baked in the frontend image
-      FRONTEND_URL:             ${SERVICE_FQDN_BACKEND_4000}
+      FRONTEND_URL:             ${SERVICE_FQDN_APP_4000}
     depends_on:
       postgres:
         condition: service_healthy
@@ -54,15 +50,6 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-
-  frontend:
-    image: vianmora/web-widget-tool-frontend:latest
-    # No `ports` here — Coolify handles ingress and TLS termination.
-    expose:
-      - "80"
-    depends_on:
-      - backend
-    restart: unless-stopped
 
 volumes:
   postgres_data:

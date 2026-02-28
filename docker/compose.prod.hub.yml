@@ -1,17 +1,14 @@
 # =============================================================================
-# Production — images pré-buildées depuis Docker Hub
+# Production — image pré-buildée depuis Docker Hub
 #
-# Utilise les images publiées par le workflow CI (docker-publish.yml).
+# Utilise l'image publiée par le workflow CI (docker-publish.yml).
 # Aucun build local requis.
 #
 # Usage:
 #   cp .env.example .env.prod   # fill in all required variables
 #   docker compose -f docker/compose.prod.hub.yml --env-file .env.prod up -d
 #
-# Note: VITE_API_URL est baked dans l'image frontend au moment du build CI.
-# Elle doit correspondre à l'URL publique de votre backend.
-#
-# The app is reachable on http://host:${PORT:-3000}
+# The app is reachable on http://host:${PORT:-4000}
 # Put a reverse proxy (Nginx, Caddy, Traefik…) in front for HTTPS.
 # =============================================================================
 
@@ -31,8 +28,8 @@ services:
       retries: 5
     restart: unless-stopped
 
-  backend:
-    image: vianmora/web-widget-tool-backend:latest
+  app:
+    image: vianmora/web-widget-tool:latest
     ports:
       - "${PORT:-4000}:4000"
     environment:
@@ -52,14 +49,6 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-
-  frontend:
-    image: vianmora/web-widget-tool-frontend:latest
-    ports:
-      - "${FRONTEND_PORT:-3000}:80"
-    depends_on:
-      - backend
-    restart: unless-stopped
 
 volumes:
   postgres_data:
