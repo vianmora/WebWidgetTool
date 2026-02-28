@@ -1,3 +1,9 @@
+name: web-widget-tool
+
+env_file:
+  - path: ../.env
+    required: false
+
 services:
   postgres:
     image: postgres:16-alpine
