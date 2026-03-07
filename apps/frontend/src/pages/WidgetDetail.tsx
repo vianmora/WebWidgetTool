@@ -270,7 +270,7 @@ export default function WidgetDetail() {
 
   // ── View mode ──────────────────────────────────────────────────────────────
   return (
-    <div className="p-6 max-w-2xl mx-auto">
+    <div className="p-6 max-w-6xl mx-auto">
       {/* Header */}
       <div className="flex items-center gap-3 mb-6">
         <Link to="/" className="text-gray-400 hover:text-primary transition-colors text-lg leading-none">←</Link>
@@ -321,7 +321,7 @@ export default function WidgetDetail() {
                 key={previewKey}
                 srcDoc={previewSrcdoc}
                 className="w-full"
-                style={{ minHeight: 240, border: 'none' }}
+                style={{ minHeight: 408, border: 'none' }}
                 title="Aperçu du widget"
               />
             </div>
