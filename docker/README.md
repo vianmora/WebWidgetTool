@@ -16,17 +16,17 @@ Ce dossier contient tous les fichiers Docker Compose du projet.
 
 ## compose.dev.yml — Développement
 
-Build local des images backend et frontend depuis les sources.
-À utiliser en développement ou pour tester avant de pousser.
+Monte le code source en volume. **Aucun rebuild nécessaire** — les modifications
+sont appliquées instantanément via ts-node-dev (backend) et Vite (frontend).
 
 ```bash
 # Depuis la racine du projet
-docker compose -f docker/compose.dev.yml up --build
+docker compose -f docker/compose.dev.yml up -d
 ```
 
-- Backend sur `http://localhost:4000`
-- Frontend sur `http://localhost:3000`
-- Les variables `VITE_API_URL` et `FRONTEND_URL` se configurent dans `.env`
+- Backend sur `http://localhost:4000` (hot-reload via ts-node-dev)
+- Frontend sur `http://localhost:5173` (hot-reload via Vite)
+- Modifier un fichier source → rechargement automatique, pas de rebuild
 
 ---
 
