@@ -1,3 +1,9 @@
+export interface WidgetTemplate {
+  id: string;
+  label: string;
+  config: Record<string, any>;
+}
+
 export interface WidgetDefinition {
   type: string;
   name: string;
@@ -7,7 +13,8 @@ export interface WidgetDefinition {
   status: 'available' | 'soon';
   defaultConfig: Record<string, any>;
   fields: FieldDefinition[];
-  apiWidget?: boolean; // expose a /widget/:id/data endpoint usable as webhook
+  apiWidget?: boolean;
+  templates?: WidgetTemplate[];
 }
 
 export interface FieldDefinition {
@@ -33,6 +40,12 @@ export const WIDGET_CATALOG: WidgetDefinition[] = [
     status: 'available',
     apiWidget: true,
     defaultConfig: { placeId: '', maxReviews: 5, minRating: 4, theme: 'light', accentColor: '#621B7A', layout: 'list', language: 'fr' },
+    templates: [
+      { id: 'list-light', label: 'Liste claire', config: { layout: 'list', theme: 'light' } },
+      { id: 'grid-light', label: 'Grille claire', config: { layout: 'grid', theme: 'light' } },
+      { id: 'list-dark', label: 'Liste sombre', config: { layout: 'list', theme: 'dark' } },
+      { id: 'grid-dark', label: 'Grille sombre', config: { layout: 'grid', theme: 'dark' } },
+    ],
     fields: [
       { key: 'placeId', label: 'Google Place ID', type: 'text', placeholder: 'ChIJ...', required: true, help: 'Trouvez votre Place ID sur Google Maps Platform' },
       { key: 'maxReviews', label: 'Nombre d\'avis max', type: 'number', min: 1, max: 20 },
@@ -51,6 +64,12 @@ export const WIDGET_CATALOG: WidgetDefinition[] = [
     icon: '💬',
     status: 'available',
     defaultConfig: { items: [], layout: 'grid', theme: 'light', accentColor: '#621B7A' },
+    templates: [
+      { id: 'grid-light', label: 'Grille claire', config: { layout: 'grid', theme: 'light' } },
+      { id: 'list-light', label: 'Liste claire', config: { layout: 'list', theme: 'light' } },
+      { id: 'grid-dark', label: 'Grille sombre', config: { layout: 'grid', theme: 'dark' } },
+      { id: 'list-dark', label: 'Liste sombre', config: { layout: 'list', theme: 'dark' } },
+    ],
     fields: [
       { key: 'layout', label: 'Disposition', type: 'select', options: [{ value: 'grid', label: 'Grille' }, { value: 'list', label: 'Liste' }] },
       { key: 'theme', label: 'Thème', type: 'select', options: [{ value: 'light', label: 'Clair' }, { value: 'dark', label: 'Sombre' }] },
@@ -65,6 +84,10 @@ export const WIDGET_CATALOG: WidgetDefinition[] = [
     icon: '🏅',
     status: 'available',
     defaultConfig: { source: 'google', rating: 4.8, reviewCount: 120, sourceUrl: '', shape: 'pill', theme: 'light', accentColor: '#621B7A' },
+    templates: [
+      { id: 'pill-light', label: 'Pilule claire', config: { shape: 'pill', theme: 'light' } },
+      { id: 'square-dark', label: 'Carte sombre', config: { shape: 'square', theme: 'dark' } },
+    ],
     fields: [
       { key: 'source', label: 'Source', type: 'select', options: [{ value: 'google', label: 'Google' }, { value: 'trustpilot', label: 'Trustpilot' }, { value: 'tripadvisor', label: 'TripAdvisor' }] },
       { key: 'rating', label: 'Note (ex: 4.8)', type: 'number', min: 0, max: 5 },
@@ -83,6 +106,10 @@ export const WIDGET_CATALOG: WidgetDefinition[] = [
     icon: '💚',
     status: 'available',
     defaultConfig: { phone: '', message: 'Bonjour, je vous contacte depuis votre site web.', position: 'bottom-right', label: '', size: 56 },
+    templates: [
+      { id: 'right', label: 'Flottant droite', config: { position: 'bottom-right' } },
+      { id: 'left', label: 'Flottant gauche', config: { position: 'bottom-left' } },
+    ],
     fields: [
       { key: 'phone', label: 'Numéro (format international)', type: 'phone', placeholder: '33612345678', required: true },
       { key: 'message', label: 'Message pré-rempli', type: 'textarea', placeholder: 'Bonjour...' },
@@ -98,6 +125,10 @@ export const WIDGET_CATALOG: WidgetDefinition[] = [
     icon: '✈️',
     status: 'available',
     defaultConfig: { username: '', label: '', position: 'bottom-right', size: 56 },
+    templates: [
+      { id: 'right', label: 'Flottant droite', config: { position: 'bottom-right' } },
+      { id: 'left', label: 'Flottant gauche', config: { position: 'bottom-left' } },
+    ],
     fields: [
       { key: 'username', label: 'Nom d\'utilisateur Telegram', type: 'text', placeholder: 'moncompte', required: true },
       { key: 'label', label: 'Texte (optionnel)', type: 'text' },
@@ -112,6 +143,10 @@ export const WIDGET_CATALOG: WidgetDefinition[] = [
     icon: '🔗',
     status: 'available',
     defaultConfig: { links: [], size: 32, color: 'brand', layout: 'row' },
+    templates: [
+      { id: 'row', label: 'Rangée colorée', config: { layout: 'row', color: 'brand' } },
+      { id: 'column', label: 'Colonne monochrome', config: { layout: 'column', color: 'monochrome' } },
+    ],
     fields: [
       { key: 'size', label: 'Taille (px)', type: 'number', min: 16, max: 64 },
       { key: 'color', label: 'Couleur', type: 'select', options: [{ value: 'brand', label: 'Couleur de marque' }, { value: 'monochrome', label: 'Monochrome' }] },
@@ -154,6 +189,10 @@ export const WIDGET_CATALOG: WidgetDefinition[] = [
     icon: '📷',
     status: 'available',
     defaultConfig: { images: [], layout: 'grid', columns: 3, lightbox: true },
+    templates: [
+      { id: 'grid', label: 'Grille', config: { layout: 'grid' } },
+      { id: 'carousel', label: 'Carrousel', config: { layout: 'carousel' } },
+    ],
     fields: [
       { key: 'layout', label: 'Disposition', type: 'select', options: [{ value: 'grid', label: 'Grille' }, { value: 'carousel', label: 'Carrousel' }] },
       { key: 'columns', label: 'Colonnes', type: 'number', min: 1, max: 6 },
@@ -183,6 +222,10 @@ export const WIDGET_CATALOG: WidgetDefinition[] = [
     icon: '⏱️',
     status: 'available',
     defaultConfig: { targetDate: '', expiredMessage: 'Événement terminé', theme: 'light', accentColor: '#621B7A' },
+    templates: [
+      { id: 'light', label: 'Clair', config: { theme: 'light' } },
+      { id: 'dark', label: 'Sombre', config: { theme: 'dark' } },
+    ],
     fields: [
       { key: 'targetDate', label: 'Date/heure cible', type: 'date', required: true },
       { key: 'expiredMessage', label: 'Message à l\'expiration', type: 'text' },
@@ -231,6 +274,10 @@ export const WIDGET_CATALOG: WidgetDefinition[] = [
     icon: '🕐',
     status: 'available',
     defaultConfig: { timezone: 'Europe/Paris', hours: [], openLabel: 'Ouvert', closedLabel: 'Fermé', theme: 'light', accentColor: '#621B7A' },
+    templates: [
+      { id: 'light', label: 'Clair', config: { theme: 'light' } },
+      { id: 'dark', label: 'Sombre', config: { theme: 'dark' } },
+    ],
     fields: [
       { key: 'timezone', label: 'Fuseau horaire', type: 'select', options: [{ value: 'Europe/Paris', label: 'Europe/Paris' }, { value: 'Europe/London', label: 'Europe/London' }, { value: 'America/New_York', label: 'America/New_York' }] },
       { key: 'openLabel', label: 'Label "Ouvert"', type: 'text' },
@@ -262,6 +309,10 @@ export const WIDGET_CATALOG: WidgetDefinition[] = [
     icon: '❓',
     status: 'available',
     defaultConfig: { items: [], allowMultiple: false, defaultOpen: -1, theme: 'light', accentColor: '#621B7A' },
+    templates: [
+      { id: 'light', label: 'Clair', config: { theme: 'light' } },
+      { id: 'dark', label: 'Sombre', config: { theme: 'dark' } },
+    ],
     fields: [
       { key: 'allowMultiple', label: 'Permettre plusieurs ouverts', type: 'toggle' },
       { key: 'theme', label: 'Thème', type: 'select', options: [{ value: 'light', label: 'Clair' }, { value: 'dark', label: 'Sombre' }] },
@@ -276,6 +327,10 @@ export const WIDGET_CATALOG: WidgetDefinition[] = [
     icon: '💰',
     status: 'available',
     defaultConfig: { plans: [], currency: '€', theme: 'light', accentColor: '#621B7A' },
+    templates: [
+      { id: 'light', label: 'Clair', config: { theme: 'light' } },
+      { id: 'dark', label: 'Sombre', config: { theme: 'dark' } },
+    ],
     fields: [
       { key: 'currency', label: 'Devise', type: 'text', placeholder: '€' },
       { key: 'theme', label: 'Thème', type: 'select', options: [{ value: 'light', label: 'Clair' }, { value: 'dark', label: 'Sombre' }] },
@@ -290,6 +345,10 @@ export const WIDGET_CATALOG: WidgetDefinition[] = [
     icon: '👥',
     status: 'available',
     defaultConfig: { members: [], layout: 'grid', columns: 3, theme: 'light', accentColor: '#621B7A' },
+    templates: [
+      { id: 'grid', label: 'Grille', config: { layout: 'grid', theme: 'light' } },
+      { id: 'list', label: 'Liste', config: { layout: 'list', theme: 'light' } },
+    ],
     fields: [
       { key: 'layout', label: 'Disposition', type: 'select', options: [{ value: 'grid', label: 'Grille' }, { value: 'list', label: 'Liste' }] },
       { key: 'columns', label: 'Colonnes', type: 'number', min: 1, max: 6 },

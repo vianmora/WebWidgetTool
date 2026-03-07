@@ -3,11 +3,321 @@ import { useNavigate, Link } from 'react-router-dom';
 import api from '../lib/api';
 import { WIDGET_CATALOG, CATEGORIES, getWidgetDef, FieldDefinition } from '../data/widgetCatalog';
 
+type Step = 'catalog' | 'template' | 'config';
+
 interface PlacePrediction {
   place_id: string;
   description: string;
   main_text: string;
   secondary_text: string;
+}
+
+// ─── Template thumbnail (SVG mockups) ─────────────────────────────────────────
+function TemplateThumbnail({ type, templateId, className = 'w-full h-auto rounded-lg' }: {
+  type: string;
+  templateId: string;
+  className?: string;
+}) {
+  const isDark = templateId.includes('dark');
+  const isGrid = templateId.includes('grid');
+  const isLeft = templateId.includes('left');
+  const bg = isDark ? '#111827' : '#ffffff';
+  const card = isDark ? '#1f2937' : '#f9fafb';
+  const stroke = isDark ? '#374151' : '#e5e7eb';
+  const textFill = isDark ? '#d1d5db' : '#374151';
+  const subFill = isDark ? '#6b7280' : '#9ca3af';
+  const accent = '#621B7A';
+  const svgProps = { viewBox: '0 0 240 150', className, xmlns: 'http://www.w3.org/2000/svg' };
+
+  if (type === 'google_reviews' || type === 'testimonials') {
+    const isReview = type === 'google_reviews';
+    if (isGrid) {
+      return (
+        <svg {...svgProps}>
+          <rect width="240" height="150" fill={bg} rx="8"/>
+          {([[10,8],[130,8],[10,80],[130,80]] as [number,number][]).map(([x,y],i) => (
+            <g key={i}>
+              <rect x={x} y={y} width="100" height="64" fill={card} rx="6" stroke={stroke} strokeWidth="0.5"/>
+              <circle cx={x+14} cy={y+18} r="9" fill={subFill}/>
+              <rect x={x+30} y={y+12} width="54" height="6" fill={textFill} rx="2"/>
+              {isReview && [0,1,2,3,4].map(s => <rect key={s} x={x+30+s*11} y={y+22} width="9" height="6" fill="#fbbf24" rx="1"/>)}
+              {!isReview && <text key="q" x={x+8} y={y+26} fontSize="16" fill={accent} opacity="0.4">"</text>}
+              <rect x={x+10} y={y+36} width="80" height="4" fill={subFill} rx="2"/>
+              <rect x={x+10} y={y+44} width="64" height="4" fill={subFill} rx="2"/>
+              {!isReview && <circle cx={x+18} cy={y+56} r="6" fill={subFill}/>}
+              {!isReview && <rect x={x+28} y={y+52} width="44" height="4" fill={textFill} rx="2"/>}
+            </g>
+          ))}
+        </svg>
+      );
+    }
+    return (
+      <svg {...svgProps}>
+        <rect width="240" height="150" fill={bg} rx="8"/>
+        {[0,1,2].map(i => {
+          const y = 8 + i * 46;
+          return (
+            <g key={i}>
+              <rect x="10" y={y} width="220" height="38" fill={card} rx="6" stroke={stroke} strokeWidth="0.5"/>
+              <circle cx="28" cy={y+19} r="11" fill={subFill}/>
+              {isReview && <>
+                <rect x="46" y={y+9} width="70" height="6" fill={textFill} rx="2"/>
+                {[0,1,2,3,4].map(s => <rect key={s} x={46+s*13} y={y+19} width="10" height="7" fill="#fbbf24" rx="1"/>)}
+                <rect x="46" y={y+30} width="140" height="4" fill={subFill} rx="2"/>
+              </>}
+              {!isReview && <>
+                <text x="44" y={y+18} fontSize="14" fill={accent} opacity="0.4">"</text>
+                <rect x="54" y={y+9} width="140" height="5" fill={subFill} rx="2"/>
+                <rect x="54" y={y+18} width="110" height="4" fill={subFill} rx="2"/>
+                <rect x="46" y={y+28} width="60" height="4" fill={textFill} rx="2"/>
+              </>}
+            </g>
+          );
+        })}
+      </svg>
+    );
+  }
+
+  if (type === 'rating_badge') {
+    const isPill = templateId.includes('pill');
+    return (
+      <svg {...svgProps}>
+        <rect width="240" height="150" fill={bg} rx="8"/>
+        {isPill ? (
+          <g>
+            <rect x="30" y="45" width="180" height="60" fill={accent} rx="30"/>
+            <rect x="56" y="63" width="44" height="24" fill="rgba(255,255,255,0.15)" rx="12"/>
+            <rect x="60" y="70" width="36" height="10" fill="white" rx="3"/>
+            <rect x="116" y="58" width="78" height="8" fill="rgba(255,255,255,0.7)" rx="2"/>
+            <rect x="116" y="70" width="60" height="6" fill="rgba(255,255,255,0.5)" rx="2"/>
+            <rect x="116" y="80" width="70" height="5" fill="rgba(255,255,255,0.4)" rx="2"/>
+          </g>
+        ) : (
+          <g>
+            <rect x="60" y="15" width="120" height="120" fill={isDark ? card : '#fff'} rx="12" stroke={stroke} strokeWidth="1"/>
+            <rect x="80" y="32" width="80" height="8" fill={textFill} rx="3"/>
+            <rect x="88" y="50" width="64" height="20" fill={accent} rx="6"/>
+            <rect x="78" y="80" width="84" height="8" fill="#fbbf24" rx="2"/>
+            <rect x="88" y="96" width="64" height="6" fill={subFill} rx="2"/>
+            <rect x="92" y="110" width="56" height="6" fill={subFill} rx="2"/>
+          </g>
+        )}
+      </svg>
+    );
+  }
+
+  if (type === 'whatsapp_button' || type === 'telegram_button') {
+    const btnColor = type === 'whatsapp_button' ? '#25d366' : '#0088cc';
+    const cx = isLeft ? 28 : 212;
+    return (
+      <svg {...svgProps}>
+        <rect width="240" height="150" fill={bg} rx="8"/>
+        {[18,34,50,66,82].map(y => <rect key={y} x="20" y={y} width="200" height="10" fill={card} rx="3" stroke={stroke} strokeWidth="0.5"/>)}
+        <rect x="20" y="100" width="200" height="40" fill={card} rx="6" stroke={stroke} strokeWidth="0.5"/>
+        <circle cx={cx} cy="128" r="16" fill={btnColor}/>
+        <rect x={cx-8} y="122" width="16" height="2" fill="white" rx="1"/>
+        <rect x={cx-8} y="126" width="12" height="2" fill="white" rx="1"/>
+        <rect x={cx-8} y="130" width="14" height="2" fill="white" rx="1"/>
+      </svg>
+    );
+  }
+
+  if (type === 'social_icons') {
+    const isRow = templateId === 'row';
+    const colors = isRow
+      ? ['#1877f2','#e4405f','#0077b5','#1da1f2']
+      : ['#374151','#374151','#374151','#374151'];
+    return (
+      <svg {...svgProps}>
+        <rect width="240" height="150" fill={bg} rx="8"/>
+        {isRow ? (
+          [0,1,2,3].map(i => (
+            <circle key={i} cx={72+i*32} cy="75" r="18" fill={colors[i]}/>
+          ))
+        ) : (
+          [0,1,2,3].map(i => (
+            <circle key={i} cx="120" cy={22+i*32} r="14" fill={colors[i]}/>
+          ))
+        )}
+      </svg>
+    );
+  }
+
+  if (type === 'image_gallery') {
+    const isCarousel = templateId === 'carousel';
+    return (
+      <svg {...svgProps}>
+        <rect width="240" height="150" fill={bg} rx="8"/>
+        {isCarousel ? (
+          <g>
+            <rect x="10" y="15" width="220" height="100" fill={card} rx="8" stroke={stroke} strokeWidth="1"/>
+            <rect x="20" y="22" width="200" height="80" fill={subFill} rx="4" opacity="0.25"/>
+            <rect x="88" y="52" width="64" height="20" fill={subFill} rx="3" opacity="0.3"/>
+            <circle cx="28" cy="128" r="10" fill={accent} opacity="0.8"/>
+            <rect x="22" y="124" width="12" height="8" fill="transparent"/>
+            <rect x="24" y="126" width="2" height="4" fill="white" rx="1"/>
+            <rect x="28" y="124" width="2" height="8" fill="white" rx="1"/>
+            <circle cx="212" cy="128" r="10" fill={accent} opacity="0.8"/>
+            <rect x="210" y="126" width="2" height="4" fill="white" rx="1"/>
+            <rect x="214" y="124" width="2" height="8" fill="white" rx="1"/>
+            {[0,1,2,3,4].map(i => <circle key={i} cx={100+i*10} cy="128" r="3" fill={i===2?accent:subFill} opacity="0.6"/>)}
+          </g>
+        ) : (
+          <g>
+            {([[8,8],[88,8],[168,8],[8,82],[88,82],[168,82]] as [number,number][]).map(([x,y],i) => (
+              <rect key={i} x={x} y={y} width="72" height="56" fill={subFill} rx="4" opacity="0.25"/>
+            ))}
+          </g>
+        )}
+      </svg>
+    );
+  }
+
+  if (type === 'faq') {
+    return (
+      <svg {...svgProps}>
+        <rect width="240" height="150" fill={bg} rx="8"/>
+        {/* First item open */}
+        <rect x="10" y="8" width="220" height="50" fill={card} rx="6" stroke={stroke} strokeWidth="0.5"/>
+        <rect x="20" y="18" width="150" height="6" fill={textFill} rx="2"/>
+        <rect x="210" y="17" width="12" height="8" fill="transparent"/>
+        <rect x="212" y="20" width="8" height="2" fill={accent} rx="1"/>
+        <rect x="20" y="32" width="180" height="4" fill={subFill} rx="2"/>
+        <rect x="20" y="40" width="150" height="4" fill={subFill} rx="2"/>
+        {/* Closed items */}
+        {[66,96,126].map((y, i) => (
+          <g key={i}>
+            <rect x="10" y={y} width="220" height="26" fill={card} rx="6" stroke={stroke} strokeWidth="0.5"/>
+            <rect x="20" y={y+10} width={140-i*10} height="6" fill={textFill} rx="2" opacity="0.7"/>
+            <rect x="212" y={y+9} width="8" height="2" fill={subFill} rx="1"/>
+            <rect x="215" y={y+6} width="2" height="8" fill={subFill} rx="1"/>
+          </g>
+        ))}
+      </svg>
+    );
+  }
+
+  if (type === 'team_members') {
+    if (isGrid) {
+      return (
+        <svg {...svgProps}>
+          <rect width="240" height="150" fill={bg} rx="8"/>
+          {([[8,8],[88,8],[168,8],[8,84],[88,84],[168,84]] as [number,number][]).map(([x,y],i) => (
+            <g key={i}>
+              <rect x={x} y={y} width="72" height="60" fill={card} rx="6" stroke={stroke} strokeWidth="0.5"/>
+              <circle cx={x+36} cy={y+22} r="14" fill={subFill}/>
+              <rect x={x+12} y={y+42} width="48" height="5" fill={textFill} rx="2"/>
+              <rect x={x+16} y={y+51} width="40" height="4" fill={subFill} rx="2"/>
+            </g>
+          ))}
+        </svg>
+      );
+    }
+    return (
+      <svg {...svgProps}>
+        <rect width="240" height="150" fill={bg} rx="8"/>
+        {[0,1,2,3].map(i => {
+          const y = 8 + i * 34;
+          return (
+            <g key={i}>
+              <rect x="10" y={y} width="220" height="28" fill={card} rx="6" stroke={stroke} strokeWidth="0.5"/>
+              <circle cx="28" cy={y+14} r="10" fill={subFill}/>
+              <rect x="44" y={y+7} width="80" height="5" fill={textFill} rx="2"/>
+              <rect x="44" y={y+16} width="60" height="4" fill={subFill} rx="2"/>
+              {[0,1,2].map(s => <circle key={s} cx={182+s*14} cy={y+14} r="5" fill={subFill} opacity="0.4"/>)}
+            </g>
+          );
+        })}
+      </svg>
+    );
+  }
+
+  if (type === 'countdown_timer') {
+    return (
+      <svg {...svgProps}>
+        <rect width="240" height="150" fill={bg} rx="8"/>
+        {([['12','J'],['08','H'],['34','M'],['52','S']] as [string,string][]).map(([num, unit], i) => {
+          const x = 14 + i * 56;
+          return (
+            <g key={i}>
+              <rect x={x} y="30" width="50" height="60" fill={isDark ? accent : card} rx="10" stroke={isDark ? 'none' : stroke} strokeWidth="1"/>
+              <rect x={x+8} y="42" width="34" height="18" fill={isDark ? 'rgba(255,255,255,0.15)' : 'rgba(98,27,122,0.08)'} rx="4"/>
+              <text x={x+25} y="56" fontSize="16" fontWeight="bold" textAnchor="middle" fill={isDark ? 'white' : accent}>{num}</text>
+              <text x={x+25} y="102" fontSize="10" textAnchor="middle" fill={subFill}>{unit}</text>
+            </g>
+          );
+        })}
+      </svg>
+    );
+  }
+
+  if (type === 'business_hours') {
+    return (
+      <svg {...svgProps}>
+        <rect width="240" height="150" fill={bg} rx="8"/>
+        <rect x="10" y="8" width="220" height="134" fill={card} rx="8" stroke={stroke} strokeWidth="0.5"/>
+        <circle cx="28" cy="26" r="8" fill="#22c55e"/>
+        <rect x="44" y="22" width="70" height="6" fill={textFill} rx="2"/>
+        <rect x="44" y="32" width="50" height="4" fill={subFill} rx="2"/>
+        <rect x="18" y="46" width="204" height="1" fill={stroke}/>
+        {['Lun','Mar','Mer','Jeu','Ven','Sam'].map((day, i) => {
+          const y = 54 + i * 15;
+          const closed = i === 5;
+          return (
+            <g key={day}>
+              <rect x="20" y={y} width="28" height="5" fill={closed ? subFill : textFill} rx="2" opacity={closed ? 0.5 : 0.8}/>
+              <rect x="148" y={y} width="62" height="5" fill={closed ? '#ef4444' : subFill} rx="2" opacity={closed ? 0.6 : 0.7}/>
+            </g>
+          );
+        })}
+      </svg>
+    );
+  }
+
+  if (type === 'pricing_table') {
+    return (
+      <svg {...svgProps}>
+        <rect width="240" height="150" fill={bg} rx="8"/>
+        {([[8, false],[84, true],[160, false]] as [number,boolean][]).map(([x, featured], i) => (
+          <g key={i}>
+            <rect x={x} y={featured ? 4 : 14} width="68" height={featured ? 142 : 122} fill={featured ? accent : card} rx="8" stroke={featured ? 'none' : stroke} strokeWidth="0.5"/>
+            <rect x={x+8} y={(featured ? 4 : 14)+12} width="52" height="6" fill={featured ? 'rgba(255,255,255,0.9)' : textFill} rx="2"/>
+            <rect x={x+8} y={(featured ? 4 : 14)+26} width="36" height="12" fill={featured ? 'rgba(255,255,255,0.2)' : 'rgba(98,27,122,0.08)'} rx="4"/>
+            <rect x={x+10} y={(featured ? 4 : 14)+30} width="32" height="4" fill={featured ? 'white' : accent} rx="2"/>
+            {[0,1,2,3].map(j => (
+              <rect key={j} x={x+10} y={(featured ? 4 : 14)+50+j*14} width="48" height="4" fill={featured ? 'rgba(255,255,255,0.6)' : subFill} rx="2"/>
+            ))}
+          </g>
+        ))}
+      </svg>
+    );
+  }
+
+  if (type === 'logo_carousel') {
+    return (
+      <svg {...svgProps}>
+        <rect width="240" height="150" fill={bg} rx="8"/>
+        {[16,76,136,196].map(x => (
+          <g key={x}>
+            <rect x={x} y="55" width="44" height="40" fill={card} rx="4" stroke={stroke} strokeWidth="0.5"/>
+            <rect x={x+8} y="65" width="28" height="20" fill={subFill} rx="2" opacity="0.2"/>
+          </g>
+        ))}
+      </svg>
+    );
+  }
+
+  // Generic fallback
+  return (
+    <svg {...svgProps}>
+      <rect width="240" height="150" fill={bg} rx="8"/>
+      <rect x="20" y="28" width="200" height="94" fill={card} rx="8" stroke={stroke} strokeWidth="1"/>
+      <rect x="36" y="48" width="168" height="10" fill={subFill} rx="3" opacity="0.5"/>
+      <rect x="36" y="66" width="136" height="8" fill={subFill} rx="3" opacity="0.4"/>
+      <rect x="36" y="82" width="150" height="8" fill={subFill} rx="3" opacity="0.4"/>
+      <rect x="36" y="98" width="96" height="8" fill={accent} rx="3" opacity="0.4"/>
+    </svg>
+  );
 }
 
 // ─── Generic field renderer ────────────────────────────────────────────────────
@@ -73,7 +383,6 @@ function FieldInput({ field, value, onChange }: { field: FieldDefinition; value:
       </div>
     );
   }
-  // text, url, email, phone
   return (
     <div>
       <label className="label">{field.label}{field.required && <span className="text-red-500 ml-0.5">*</span>}</label>
@@ -179,7 +488,7 @@ function PlaceSearch({ placeId, onSelect }: { placeId: string; onSelect: (id: st
           </ul>
         )}
       </div>
-      {placeId && <p className="text-xs text-green-600 mt-1">✓ Lieu sélectionné</p>}
+      {placeId && <p className="text-xs text-green-600 mt-1">Lieu sélectionné</p>}
     </div>
   );
 }
@@ -187,24 +496,57 @@ function PlaceSearch({ placeId, onSelect }: { placeId: string; onSelect: (id: st
 // ─── Main component ────────────────────────────────────────────────────────────
 export default function NewWidget() {
   const navigate = useNavigate();
+  const [step, setStep] = useState<Step>('catalog');
   const [selectedType, setSelectedType] = useState<string | null>(null);
+  const [selectedTemplateIdx, setSelectedTemplateIdx] = useState(0);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [widgetName, setWidgetName] = useState('');
   const [config, setConfig] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [apiMenuOpen, setApiMenuOpen] = useState<string | null>(null);
+  const [pendingExtra, setPendingExtra] = useState<Record<string, any>>({});
 
   const def = selectedType ? getWidgetDef(selectedType) : null;
+  const templates = def?.templates ?? [];
 
   function selectWidget(type: string, extra: Record<string, any> = {}) {
     const d = getWidgetDef(type);
     if (!d || d.status === 'soon') return;
+    const tmpl = d.templates ?? [];
     setSelectedType(type);
-    setConfig({ ...d.defaultConfig, ...extra });
+    setPendingExtra(extra);
+    setApiMenuOpen(null);
+    setError('');
+
+    if (tmpl.length >= 2 && !extra.webhookOnly) {
+      setSelectedTemplateIdx(0);
+      setStep('template');
+    } else {
+      const templateConfig = tmpl[0]?.config ?? {};
+      setConfig({ ...d.defaultConfig, ...templateConfig, ...extra });
+      setWidgetName('');
+      setStep('config');
+    }
+  }
+
+  function continueToConfig() {
+    if (!def) return;
+    const tmpl = def.templates ?? [];
+    const templateConfig = tmpl[selectedTemplateIdx]?.config ?? {};
+    setConfig({ ...def.defaultConfig, ...templateConfig, ...pendingExtra });
     setWidgetName('');
     setError('');
-    setApiMenuOpen(null);
+    setStep('config');
+  }
+
+  function goBackFromConfig() {
+    if (templates.length >= 2 && !pendingExtra.webhookOnly) {
+      setStep('template');
+    } else {
+      setStep('catalog');
+      setSelectedType(null);
+    }
   }
 
   function updateConfig(key: string, value: any) {
@@ -215,7 +557,6 @@ export default function NewWidget() {
     e.preventDefault();
     setError('');
     if (!def) return;
-    // Validate required fields
     for (const field of def.fields) {
       if (field.required && !config[field.key]) {
         setError(`Le champ "${field.label}" est requis.`);
@@ -237,8 +578,8 @@ export default function NewWidget() {
     }
   }
 
-  // ── Step 1: Catalogue ──
-  if (!selectedType) {
+  // ── Step 1: Catalogue ──────────────────────────────────────────────────────
+  if (step === 'catalog') {
     const widgetCard = (widget: typeof WIDGET_CATALOG[0]) => (
       <div key={widget.type} className="relative">
         <button
@@ -286,7 +627,6 @@ export default function NewWidget() {
           <h1 className="text-xl font-bold text-brand-text">Tous les widgets</h1>
         </div>
 
-        {/* Category filter */}
         <div className="flex gap-2 flex-wrap mb-6">
           <button
             onClick={() => setSelectedCategory(null)}
@@ -305,7 +645,6 @@ export default function NewWidget() {
           ))}
         </div>
 
-        {/* Grouped by category when no filter, flat list when filtered */}
         {selectedCategory ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
             {WIDGET_CATALOG.filter(w => w.category === selectedCategory).map(widgetCard)}
@@ -333,56 +672,133 @@ export default function NewWidget() {
     );
   }
 
-  // ── Step 2: Config form ──
+  // ── Step 2: Template picker ────────────────────────────────────────────────
+  if (step === 'template') {
+    return (
+      <div className="flex" style={{ minHeight: 'calc(100vh - 64px)' }}>
+        {/* Left panel — dark sidebar */}
+        <div className="w-72 bg-gray-900 flex flex-col flex-shrink-0">
+          <div className="p-4 border-b border-gray-800">
+            <button
+              onClick={() => { setStep('catalog'); setSelectedType(null); }}
+              className="text-gray-400 hover:text-white text-sm flex items-center gap-1.5 mb-3 transition-colors"
+            >
+              ← Retour
+            </button>
+            <div className="text-white font-semibold text-sm">{def?.icon} {def?.name}</div>
+            <div className="text-gray-400 text-xs mt-1">Choisir un template</div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-3 grid grid-cols-2 gap-3 content-start">
+            {templates.map((template, idx) => (
+              <button
+                key={template.id}
+                onClick={() => setSelectedTemplateIdx(idx)}
+                className={`p-1.5 rounded-lg border-2 transition-all text-left ${selectedTemplateIdx === idx ? 'border-green-400 bg-gray-800' : 'border-gray-700 hover:border-gray-500 hover:bg-gray-800'}`}
+              >
+                <TemplateThumbnail type={selectedType!} templateId={template.id} className="w-full h-auto rounded-md" />
+                <p className="text-xs text-gray-300 mt-1.5 text-center leading-tight">{template.label}</p>
+              </button>
+            ))}
+          </div>
+
+          <div className="p-4 border-t border-gray-800">
+            <button
+              onClick={continueToConfig}
+              className="w-full bg-green-500 hover:bg-green-400 text-white font-semibold py-3 rounded-lg text-sm transition-colors"
+            >
+              Continuer avec ce template
+            </button>
+          </div>
+        </div>
+
+        {/* Right panel — large preview */}
+        <div className="flex-1 bg-white flex flex-col items-center justify-center p-10">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-6">
+            {templates[selectedTemplateIdx]?.label}
+          </p>
+          <div className="w-full max-w-xl">
+            <TemplateThumbnail
+              type={selectedType!}
+              templateId={templates[selectedTemplateIdx]?.id ?? 'default'}
+              className="w-full h-auto rounded-2xl shadow-xl border border-gray-100"
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Step 3: Config form ────────────────────────────────────────────────────
+  const activeTemplateId = templates[selectedTemplateIdx]?.id ?? 'default';
+
   return (
-    <div className="p-6 max-w-4xl mx-auto">
+    <div className="p-6 max-w-5xl mx-auto">
       <div className="flex items-center gap-3 mb-6">
-        <button onClick={() => setSelectedType(null)} className="text-gray-400 hover:text-primary transition-colors text-lg leading-none">←</button>
-        <div>
+        <button onClick={goBackFromConfig} className="text-gray-400 hover:text-primary transition-colors text-lg leading-none">←</button>
+        <div className="flex-1">
           <h1 className="text-xl font-bold text-brand-text">{def?.icon} {def?.name}</h1>
           <p className="text-xs text-gray-400">{def?.description}</p>
         </div>
+        {templates[selectedTemplateIdx] && (
+          <span className="text-xs text-gray-400 bg-gray-100 px-2.5 py-1 rounded-btn font-medium">
+            {templates[selectedTemplateIdx].label}
+          </span>
+        )}
       </div>
 
-      <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-        {error && <p className="text-red-600 text-sm bg-red-50 rounded-btn px-3 py-2">{error}</p>}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+        {/* Left: form */}
+        <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+          {error && <p className="text-red-600 text-sm bg-red-50 rounded-btn px-3 py-2">{error}</p>}
 
-        <div className="card flex flex-col gap-4">
-          <div>
-            <label className="label">Nom du widget</label>
-            <input className="input" type="text" value={widgetName} onChange={e => setWidgetName(e.target.value)}
-              placeholder={`Ex: ${def?.name} — Mon site`} />
+          <div className="card flex flex-col gap-4">
+            <div>
+              <label className="label">Nom du widget</label>
+              <input className="input" type="text" value={widgetName} onChange={e => setWidgetName(e.target.value)}
+                placeholder={`Ex: ${def?.name} — Mon site`} />
+            </div>
+
+            {selectedType === 'google_reviews' && (
+              <PlaceSearch
+                placeId={config.placeId || ''}
+                onSelect={(id, name) => {
+                  updateConfig('placeId', id);
+                  if (!widgetName) setWidgetName(name);
+                }}
+              />
+            )}
+
+            {def?.fields.filter(f => f.key !== 'placeId' || selectedType !== 'google_reviews').map(field => (
+              <FieldInput
+                key={field.key}
+                field={field}
+                value={config[field.key]}
+                onChange={v => updateConfig(field.key, v)}
+              />
+            ))}
           </div>
 
-          {/* Place search for Google Reviews */}
-          {selectedType === 'google_reviews' && (
-            <PlaceSearch
-              placeId={config.placeId || ''}
-              onSelect={(id, name) => {
-                updateConfig('placeId', id);
-                if (!widgetName) setWidgetName(name);
-              }}
-            />
+          <div className="flex justify-end gap-3">
+            <button type="button" onClick={goBackFromConfig} className="btn-secondary">Annuler</button>
+            <button type="submit" disabled={loading} className="btn-primary">
+              {loading ? 'Création...' : 'Créer le widget'}
+            </button>
+          </div>
+        </form>
+
+        {/* Right: template preview */}
+        <div className="hidden lg:flex flex-col items-center sticky top-6">
+          <TemplateThumbnail
+            type={selectedType!}
+            templateId={activeTemplateId}
+            className="w-full h-auto rounded-xl shadow-md border border-gray-100"
+          />
+          {templates[selectedTemplateIdx] && (
+            <p className="text-xs text-gray-400 mt-3">{templates[selectedTemplateIdx].label}</p>
           )}
-
-          {/* Generic fields */}
-          {def?.fields.filter(f => f.key !== 'placeId' || selectedType !== 'google_reviews').map(field => (
-            <FieldInput
-              key={field.key}
-              field={field}
-              value={config[field.key]}
-              onChange={v => updateConfig(field.key, v)}
-            />
-          ))}
         </div>
-
-        <div className="flex justify-end gap-3">
-          <button type="button" onClick={() => setSelectedType(null)} className="btn-secondary">Annuler</button>
-          <button type="submit" disabled={loading} className="btn-primary">
-            {loading ? 'Création...' : 'Créer le widget'}
-          </button>
-        </div>
-      </form>
+      </div>
     </div>
   );
 }
