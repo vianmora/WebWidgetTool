@@ -2,10 +2,14 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
+import rateLimit from 'express-rate-limit';
+import { isSaaS } from './lib/mode';
 import authRouter from './routes/auth';
 import widgetsRouter from './routes/widgets';
 import placesRouter from './routes/places';
 import publicRouter from './routes/public';
+import billingRouter from './routes/billing';
+import adminRouter from './routes/admin';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -17,11 +21,36 @@ const dashboardCors = cors({
 
 const openCors = cors();
 
+// Stripe webhook needs raw body — mount before express.json()
+app.use('/api/billing/webhook', express.raw({ type: 'application/json' }));
 app.use(express.json());
 
-app.use('/api/auth', dashboardCors, authRouter);
+// Rate limiting on auth routes
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Trop de tentatives. Réessayez dans 15 minutes.' },
+});
+
+// ─── Better Auth handler (SaaS mode) ─────────────────────────────────────────
+if (isSaaS()) {
+  // Dynamic import to avoid loading Better Auth in self-hosted mode
+  import('./lib/auth').then(({ auth }) => {
+    const { toNodeHandler } = require('better-auth/node');
+    app.all('/api/auth/*', authLimiter, dashboardCors, toNodeHandler(auth));
+  });
+}
+
+// ─── API routes ───────────────────────────────────────────────────────────────
+app.use('/api/auth', authLimiter, dashboardCors, authRouter);
 app.use('/api/widgets', dashboardCors, widgetsRouter);
 app.use('/api/places', dashboardCors, placesRouter);
+app.use('/api/billing', dashboardCors, billingRouter);
+app.use('/api/admin', dashboardCors, adminRouter);
+
+// ─── Public widget routes (open CORS) ────────────────────────────────────────
 app.use('/widget', openCors, publicRouter);
 
 // Serve widget.js with open CORS
@@ -32,17 +61,14 @@ app.get('/widget.js', openCors, (_, res) => {
 
 app.get('/health', (_, res) => res.json({ status: 'ok' }));
 
-// Serve the React SPA when the frontend is bundled (all-in-one mode).
-// The Dockerfile copies the frontend build to public/app/.
-// In dev (two-container) mode this directory does not exist and this block is skipped.
+// ─── SPA serving (all-in-one prod mode) ──────────────────────────────────────
 const spaDir = path.join(__dirname, '../public/app');
 const spaIndex = path.join(spaDir, 'index.html');
 if (fs.existsSync(spaIndex)) {
   app.use(express.static(spaDir));
-  // SPA fallback: serve index.html for any route not already handled above
   app.get('*', (_req, res) => res.sendFile(spaIndex));
 }
 
 app.listen(PORT, () => {
-  console.log(`Backend running on port ${PORT}`);
+  console.log(`Backend running on port ${PORT} [${process.env.APP_MODE || 'selfhosted'}]`);
 });

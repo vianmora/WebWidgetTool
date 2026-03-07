@@ -3,31 +3,28 @@ import axios from 'axios';
 import prisma from '../lib/prisma';
 import cache from '../lib/cache';
 import { fetchGoogleReviews } from '../lib/google';
+import { isSaaS } from '../lib/mode';
+import { hasReachedViewLimit } from '../lib/planLimits';
 
 const router = Router();
 
-const ALLOWED_IMAGE_HOSTS = ['lh3.googleusercontent.com', 'lh4.googleusercontent.com', 'lh5.googleusercontent.com', 'lh6.googleusercontent.com'];
+const ALLOWED_IMAGE_HOSTS = [
+  'lh3.googleusercontent.com',
+  'lh4.googleusercontent.com',
+  'lh5.googleusercontent.com',
+  'lh6.googleusercontent.com',
+];
 const imageCache = new Map<string, { data: Buffer; contentType: string }>();
 
+// ─── Image proxy (Google profile photos) ──────────────────────────────────────
 router.get('/image', async (req, res) => {
   const url = req.query.url as string;
-  if (!url) {
-    res.status(400).end();
-    return;
-  }
+  if (!url) { res.status(400).end(); return; }
 
   let parsed: URL;
-  try {
-    parsed = new URL(url);
-  } catch {
-    res.status(400).end();
-    return;
-  }
+  try { parsed = new URL(url); } catch { res.status(400).end(); return; }
 
-  if (!ALLOWED_IMAGE_HOSTS.includes(parsed.hostname)) {
-    res.status(403).end();
-    return;
-  }
+  if (!ALLOWED_IMAGE_HOSTS.includes(parsed.hostname)) { res.status(403).end(); return; }
 
   if (imageCache.has(url)) {
     const { data, contentType } = imageCache.get(url)!;
@@ -50,10 +47,66 @@ router.get('/image', async (req, res) => {
   }
 });
 
-router.get('/:id/reviews', async (req, res) => {
-  const { id } = req.params;
+// ─── Generic widget data endpoint ─────────────────────────────────────────────
+async function getWidgetData(widgetId: string, req: any) {
+  const widget = await prisma.widget.findUnique({ where: { id: widgetId } });
+  if (!widget) return null;
 
-  const cached = cache.get(id);
+  const config = widget.config as any;
+
+  switch (widget.type) {
+    case 'google_reviews': {
+      const apiKey = process.env.GOOGLE_MAPS_API_KEY || config.apiKey;
+      const language: string = config.language || 'fr';
+      const reviews = await fetchGoogleReviews(config.placeId, apiKey, language);
+
+      const minRating: number = config.minRating ?? 1;
+      const maxReviews: number = config.maxReviews ?? 5;
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+
+      const filtered = reviews
+        .filter((r) => r.rating >= minRating)
+        .slice(0, maxReviews)
+        .map((r) => ({
+          ...r,
+          profile_photo_url: r.profile_photo_url
+            ? `${baseUrl}/widget/image?url=${encodeURIComponent(r.profile_photo_url)}`
+            : r.profile_photo_url,
+        }));
+
+      return { reviews: filtered };
+    }
+
+    // Static/config-only widgets — data comes from config itself
+    case 'testimonials':
+    case 'whatsapp_button':
+    case 'telegram_button':
+    case 'social_share':
+    case 'social_icons':
+    case 'business_hours':
+    case 'faq':
+    case 'pricing_table':
+    case 'team_members':
+    case 'countdown_timer':
+    case 'back_to_top':
+    case 'cookie_banner':
+    case 'logo_carousel':
+    case 'image_gallery':
+    case 'google_map':
+    case 'rating_badge':
+      return {};
+
+    default:
+      return {};
+  }
+}
+
+// ─── GET /widget/:id/data (new generic endpoint) ───────────────────────────────
+router.get('/:id/data', async (req, res) => {
+  const { id } = req.params;
+  const cacheKey = `data:${id}`;
+
+  const cached = cache.get(cacheKey);
   if (cached) {
     res.json(cached);
     return;
@@ -61,49 +114,95 @@ router.get('/:id/reviews', async (req, res) => {
 
   try {
     const widget = await prisma.widget.findUnique({ where: { id } });
-    if (!widget) {
+    if (!widget || !widget.isActive) {
       res.status(404).json({ error: 'Widget introuvable.' });
       return;
     }
 
     const config = widget.config as any;
-    const apiKey = process.env.GOOGLE_MAPS_API_KEY || config.apiKey;
-    const language: string = config.language || 'fr';
-    const reviews = await fetchGoogleReviews(config.placeId, apiKey, language);
 
-    const minRating: number = config.minRating ?? 1;
-    const maxReviews: number = config.maxReviews ?? 5;
+    // View quota check (SaaS only)
+    let quotaExceeded = false;
+    let poweredBy = false;
 
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    if (isSaaS() && widget.userId) {
+      const user = await prisma.user.findUnique({ where: { id: widget.userId } });
+      if (user) {
+        // Reset monthly counter if needed
+        const now = new Date();
+        const resetAt = new Date(user.monthlyViewResetAt);
+        const needsReset = now.getMonth() !== resetAt.getMonth() || now.getFullYear() !== resetAt.getFullYear();
+        if (needsReset) {
+          await prisma.user.update({
+            where: { id: user.id },
+            data: { monthlyViewCount: 1, monthlyViewResetAt: now },
+          });
+        } else {
+          if (hasReachedViewLimit(user.plan, user.monthlyViewCount)) {
+            quotaExceeded = true;
+          } else {
+            await prisma.user.update({
+              where: { id: user.id },
+              data: { monthlyViewCount: { increment: 1 } },
+            });
+          }
+        }
+        poweredBy = user.plan === 'free';
+      }
+    }
 
-    const filtered = reviews
-      .filter((r) => r.rating >= minRating)
-      .slice(0, maxReviews)
-      .map((r) => ({
-        ...r,
-        profile_photo_url: r.profile_photo_url
-          ? `${baseUrl}/widget/image?url=${encodeURIComponent(r.profile_photo_url)}`
-          : r.profile_photo_url,
-      }));
+    // Track analytics
+    try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      await prisma.widgetView.upsert({
+        where: { widgetId_date: { widgetId: id, date: today } },
+        create: { widgetId: id, date: today, count: 1 },
+        update: { count: { increment: 1 } },
+      });
+    } catch {
+      // analytics failure is non-blocking
+    }
+
+    const data = await getWidgetData(id, req);
+    if (data === null) {
+      res.status(404).json({ error: 'Widget introuvable.' });
+      return;
+    }
 
     const result = {
       widget: {
         id: widget.id,
         name: widget.name,
+        type: widget.type,
         config: {
           theme: config.theme || 'light',
-          accentColor: config.accentColor || '#4F46E5',
+          accentColor: config.accentColor || '#621B7A',
           layout: config.layout || 'list',
+          ...config,
         },
       },
-      reviews: filtered,
+      data,
+      _poweredBy: poweredBy,
+      _quotaExceeded: quotaExceeded,
     };
 
-    cache.set(id, result);
+    // Only cache non-quota-exceeded responses
+    if (!quotaExceeded) {
+      cache.set(cacheKey, result);
+    }
+
     res.json(result);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// ─── Legacy alias: /widget/:id/reviews → /widget/:id/data ─────────────────────
+router.get('/:id/reviews', async (req, res) => {
+  // Forward to the new endpoint logic for backwards compatibility
+  req.url = `/${req.params.id}/data`;
+  res.redirect(307, `/widget/${req.params.id}/data`);
 });
 
 export default router;

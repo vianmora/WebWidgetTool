@@ -1,14 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import api from '../lib/api';
-
-interface Review {
-  author_name: string;
-  rating: number;
-  text: string;
-  profile_photo_url: string;
-  relative_time_description: string;
-}
+import { WIDGET_CATALOG, CATEGORIES, getWidgetDef, FieldDefinition } from '../data/widgetCatalog';
 
 interface PlacePrediction {
   place_id: string;
@@ -17,330 +10,88 @@ interface PlacePrediction {
   secondary_text: string;
 }
 
-export interface FormState {
-  name: string;
-  placeId: string;
-  placeName: string;
-  placeDescription: string;
-  layout: string;
-  maxReviews: number;
-  minRating: number;
-  theme: string;
-  accentColor: string;
-  // Header design
-  showHeader: boolean;
-  headerTitle: string;
-  // Reviews design
-  showAvatar: boolean;
-  showDate: boolean;
-  truncateText: boolean;
-  // Webhook
-  language: string;
-}
-
-export const FORM_DEFAULTS: Omit<FormState, 'name' | 'placeId' | 'placeName' | 'placeDescription'> = {
-  layout: 'list',
-  maxReviews: 5,
-  minRating: 4,
-  theme: 'light',
-  accentColor: '#4F46E5',
-  showHeader: true,
-  headerTitle: '',
-  showAvatar: true,
-  showDate: true,
-  truncateText: true,
-  language: 'fr',
-};
-
-export const MOCK_REVIEWS: Review[] = [
-  { author_name: 'Marie Dupont', rating: 5, text: 'Excellent service, personnel très accueillant ! Je recommande vivement à tous.', profile_photo_url: '', relative_time_description: 'il y a 2 semaines' },
-  { author_name: 'Jean Martin', rating: 5, text: 'Très bonne expérience, je reviendrai sans hésiter.', profile_photo_url: '', relative_time_description: 'il y a 1 mois' },
-  { author_name: 'Sophie Bernard', rating: 4, text: 'Bon rapport qualité-prix, personnel sympathique.', profile_photo_url: '', relative_time_description: 'il y a 3 semaines' },
-];
-
-export const LAYOUTS = [
-  { value: 'list', label: 'Liste', desc: 'Cartes empilées' },
-  { value: 'grid', label: 'Grille', desc: '2 colonnes' },
-  { value: 'stars', label: 'Étoiles', desc: 'Vue compacte' },
-  { value: 'slider', label: 'Slider', desc: 'Défilement horiz.' },
-  { value: 'badge', label: 'Badge', desc: 'Synthèse compacte' },
-];
-
-const LANGUAGES = [
-  { value: 'fr', label: 'Français' },
-  { value: 'en', label: 'English' },
-  { value: 'es', label: 'Español' },
-  { value: 'de', label: 'Deutsch' },
-];
-
-// --- Shared preview components ---
-
-export function StarRating({ rating }: { rating: number }) {
-  return (
-    <span>
-      {[1,2,3,4,5].map(i => (
-        <span key={i} style={{ color: i <= rating ? '#FBBF24' : '#D1D5DB' }}>★</span>
-      ))}
-    </span>
-  );
-}
-
-function ReviewText({ text, truncate, color }: { text: string; truncate: boolean; color: string }) {
-  const style: React.CSSProperties = { color, margin: 0, fontSize: 14, lineHeight: 1.6 };
-  if (truncate) {
-    Object.assign(style, { display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' });
+// ─── Generic field renderer ────────────────────────────────────────────────────
+function FieldInput({ field, value, onChange }: { field: FieldDefinition; value: any; onChange: (v: any) => void }) {
+  if (field.type === 'toggle') {
+    return (
+      <div className="flex items-center justify-between">
+        <label className="label mb-0">{field.label}</label>
+        <button
+          type="button"
+          onClick={() => onChange(!value)}
+          className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${value ? 'bg-primary' : 'bg-gray-200'}`}
+        >
+          <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${value ? 'translate-x-4' : 'translate-x-0'}`} />
+        </button>
+      </div>
+    );
   }
-  return <p style={style}>{text}</p>;
-}
-
-function CardHeader({ review, isDark, showAvatar, avatarSize = 36 }: {
-  review: Review; isDark: boolean; showAvatar: boolean; avatarSize?: number;
-}) {
-  const textColor = isDark ? '#F9FAFB' : '#111827';
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-      {showAvatar && (
-        review.profile_photo_url
-          ? <img src={review.profile_photo_url} alt="" style={{ width: avatarSize, height: avatarSize, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-          : <div style={{ width: avatarSize, height: avatarSize, borderRadius: '50%', background: isDark ? '#374151' : '#E5E7EB', flexShrink: 0 }} />
-      )}
+  if (field.type === 'select') {
+    return (
       <div>
-        <div style={{ fontWeight: 600, fontSize: avatarSize === 32 ? 13 : 14, color: textColor }}>{review.author_name}</div>
-        <StarRating rating={review.rating} />
+        <label className="label">{field.label}</label>
+        <select className="input" value={value ?? ''} onChange={e => onChange(e.target.value)}>
+          {field.options?.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
       </div>
-    </div>
-  );
-}
-
-function ReviewCardList({ review, isDark, showAvatar, showDate, truncateText }: {
-  review: Review; isDark: boolean; showAvatar: boolean; showDate: boolean; truncateText: boolean;
-}) {
-  const bg = isDark ? '#111827' : '#F9FAFB';
-  const border = isDark ? '#374151' : '#E5E7EB';
-  const subColor = isDark ? '#9CA3AF' : '#6B7280';
-  return (
-    <div style={{ padding: 16, background: bg, borderRadius: 8, border: `1px solid ${border}`, marginBottom: 12 }}>
-      <CardHeader review={review} isDark={isDark} showAvatar={showAvatar} />
-      {review.text && <ReviewText text={review.text} truncate={truncateText} color={subColor} />}
-      {showDate && review.relative_time_description && <div style={{ color: subColor, fontSize: 12, marginTop: 8 }}>{review.relative_time_description}</div>}
-    </div>
-  );
-}
-
-function ReviewCardGrid({ review, isDark, showAvatar, showDate, truncateText }: {
-  review: Review; isDark: boolean; showAvatar: boolean; showDate: boolean; truncateText: boolean;
-}) {
-  const bg = isDark ? '#111827' : '#F9FAFB';
-  const border = isDark ? '#374151' : '#E5E7EB';
-  const subColor = isDark ? '#9CA3AF' : '#6B7280';
-  return (
-    <div style={{ padding: 16, background: bg, borderRadius: 8, border: `1px solid ${border}`, display: 'flex', flexDirection: 'column' }}>
-      <CardHeader review={review} isDark={isDark} showAvatar={showAvatar} avatarSize={32} />
-      {review.text && <ReviewText text={review.text} truncate={truncateText} color={subColor} />}
-      {showDate && review.relative_time_description && <div style={{ color: subColor, fontSize: 11, marginTop: 8 }}>{review.relative_time_description}</div>}
-    </div>
-  );
-}
-
-function ReviewCardStars({ review, isDark, showAvatar, showDate }: {
-  review: Review; isDark: boolean; showAvatar: boolean; showDate: boolean;
-}) {
-  const border = isDark ? '#374151' : '#E5E7EB';
-  const textColor = isDark ? '#F9FAFB' : '#111827';
-  const subColor = isDark ? '#9CA3AF' : '#6B7280';
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: `1px solid ${border}` }}>
-      {showAvatar && (
-        review.profile_photo_url
-          ? <img src={review.profile_photo_url} alt="" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-          : <div style={{ width: 32, height: 32, borderRadius: '50%', background: isDark ? '#374151' : '#E5E7EB', flexShrink: 0 }} />
-      )}
-      <span style={{ fontWeight: 600, fontSize: 14, color: textColor, flex: 1 }}>{review.author_name}</span>
-      <StarRating rating={review.rating} />
-      {showDate && review.relative_time_description && <span style={{ fontSize: 12, color: subColor, whiteSpace: 'nowrap' }}>{review.relative_time_description}</span>}
-    </div>
-  );
-}
-
-function ReviewCardSlider({ review, isDark, showAvatar, showDate, truncateText }: {
-  review: Review; isDark: boolean; showAvatar: boolean; showDate: boolean; truncateText: boolean;
-}) {
-  const bg = isDark ? '#111827' : '#F9FAFB';
-  const border = isDark ? '#374151' : '#E5E7EB';
-  const subColor = isDark ? '#9CA3AF' : '#6B7280';
-  return (
-    <div style={{ padding: 16, background: bg, borderRadius: 8, border: `1px solid ${border}`, minWidth: 260, maxWidth: 300, flexShrink: 0, scrollSnapAlign: 'start', display: 'flex', flexDirection: 'column' }}>
-      <CardHeader review={review} isDark={isDark} showAvatar={showAvatar} />
-      {review.text && <ReviewText text={review.text} truncate={truncateText} color={subColor} />}
-      {showDate && review.relative_time_description && <div style={{ color: subColor, fontSize: 12, marginTop: 8 }}>{review.relative_time_description}</div>}
-    </div>
-  );
-}
-
-function BadgePreview({ reviews, isDark, accentColor }: { reviews: Review[]; isDark: boolean; accentColor: string }) {
-  const bg = isDark ? '#111827' : '#F9FAFB';
-  const border = isDark ? '#374151' : '#E5E7EB';
-  const subColor = isDark ? '#9CA3AF' : '#6B7280';
-  const avg = reviews.length > 0 ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length : 5;
-  return (
-    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 12, padding: '12px 20px', background: bg, borderRadius: 100, border: `1px solid ${border}` }}>
-      <span style={{ fontSize: 24, fontWeight: 700, color: accentColor }}>{avg.toFixed(1)}</span>
-      <div>
-        <span style={{ fontSize: 18, letterSpacing: -2 }}>
-          {[1,2,3,4,5].map(i => <span key={i} style={{ color: i <= Math.round(avg) ? '#FBBF24' : '#D1D5DB' }}>★</span>)}
-        </span>
-        <div style={{ fontSize: 11, color: subColor, marginTop: 2 }}>{reviews.length} avis Google</div>
-      </div>
-      <div style={{ width: 1, height: 36, background: border }} />
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: 11, color: subColor }}>Voir les avis</div>
-        <div style={{ fontSize: 10, color: subColor, marginTop: 2, fontStyle: 'italic' }}>Google</div>
-      </div>
-    </div>
-  );
-}
-
-export function LivePreview({ reviews, layout, theme, accentColor, widgetName, showHeader, headerTitle, showAvatar, showDate, truncateText }: {
-  reviews: Review[]; layout: string; theme: string; accentColor: string; widgetName: string;
-  showHeader: boolean; headerTitle: string; showAvatar: boolean; showDate: boolean; truncateText: boolean;
-}) {
-  const isDark = theme === 'dark';
-  const subColor = isDark ? '#9CA3AF' : '#6B7280';
-  const title = headerTitle || widgetName;
-
-  function renderReviews() {
-    if (layout === 'badge') {
-      return <BadgePreview reviews={reviews} isDark={isDark} accentColor={accentColor} />;
-    }
-    if (layout === 'slider') {
-      return (
-        <div style={{ display: 'flex', gap: 12, overflowX: 'auto', scrollSnapType: 'x mandatory', paddingBottom: 8 }}>
-          {reviews.map((r, i) => <ReviewCardSlider key={i} review={r} isDark={isDark} showAvatar={showAvatar} showDate={showDate} truncateText={truncateText} />)}
-        </div>
-      );
-    }
-    if (layout === 'grid') {
-      return (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          {reviews.map((r, i) => <ReviewCardGrid key={i} review={r} isDark={isDark} showAvatar={showAvatar} showDate={showDate} truncateText={truncateText} />)}
-        </div>
-      );
-    }
-    if (layout === 'stars') {
-      return <div>{reviews.map((r, i) => <ReviewCardStars key={i} review={r} isDark={isDark} showAvatar={showAvatar} showDate={showDate} />)}</div>;
-    }
-    return <div>{reviews.map((r, i) => <ReviewCardList key={i} review={r} isDark={isDark} showAvatar={showAvatar} showDate={showDate} truncateText={truncateText} />)}</div>;
+    );
   }
-
+  if (field.type === 'color') {
+    return (
+      <div>
+        <label className="label">{field.label}</label>
+        <div className="flex gap-2">
+          <input type="color" value={value || '#621B7A'} onChange={e => onChange(e.target.value)} className="h-9 w-10 border border-gray-200 rounded-btn cursor-pointer p-0.5" />
+          <input type="text" value={value || ''} onChange={e => onChange(e.target.value)} className="input font-mono" placeholder="#621B7A" />
+        </div>
+      </div>
+    );
+  }
+  if (field.type === 'textarea') {
+    return (
+      <div>
+        <label className="label">{field.label}</label>
+        <textarea className="input min-h-[80px] resize-y" value={value ?? ''} onChange={e => onChange(e.target.value)} placeholder={field.placeholder} rows={3} />
+        {field.help && <p className="text-xs text-gray-400 mt-1">{field.help}</p>}
+      </div>
+    );
+  }
+  if (field.type === 'number') {
+    return (
+      <div>
+        <label className="label">{field.label}</label>
+        <input type="number" className="input" value={value ?? ''} min={field.min} max={field.max}
+          onChange={e => onChange(parseFloat(e.target.value))} />
+      </div>
+    );
+  }
+  if (field.type === 'date') {
+    return (
+      <div>
+        <label className="label">{field.label}</label>
+        <input type="datetime-local" className="input" value={value ?? ''} onChange={e => onChange(e.target.value)} />
+      </div>
+    );
+  }
+  // text, url, email, phone
   return (
-    <div style={{ fontFamily: 'system-ui,-apple-system,sans-serif' }}>
-      {showHeader && <h3 style={{ color: accentColor, margin: '0 0 20px', fontSize: 18, fontWeight: 700 }}>{title}</h3>}
-      {renderReviews()}
-      <div style={{ textAlign: 'center', marginTop: 16, fontSize: 11, color: subColor }}>Powered by WebWidget</div>
+    <div>
+      <label className="label">{field.label}{field.required && <span className="text-red-500 ml-0.5">*</span>}</label>
+      <input
+        type={field.type === 'phone' ? 'tel' : field.type}
+        className="input"
+        value={value ?? ''}
+        onChange={e => onChange(e.target.value)}
+        placeholder={field.placeholder}
+        required={field.required}
+      />
+      {field.help && <p className="text-xs text-gray-400 mt-1">{field.help}</p>}
     </div>
   );
 }
 
-// --- Webhook info panel ---
-
-function WebhookInfoPanel({ apiUrl }: { apiUrl: string }) {
-  const mockResponse = {
-    widget: { id: 'abc123', name: 'Mon restaurant' },
-    reviews: [
-      {
-        author_name: 'Marie Dupont',
-        rating: 5,
-        text: 'Excellent service !',
-        profile_photo_url: 'https://…',
-        relative_time_description: 'il y a 2 semaines',
-      },
-    ],
-  };
-
-  return (
-    <div className="space-y-4">
-      <div>
-        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Endpoint</p>
-        <code className="block bg-gray-950 text-green-400 text-xs p-3 rounded-lg break-all">
-          GET {apiUrl}/widget/{'{'}{'{'}WIDGET_ID{'}'}{'}'}/reviews
-        </code>
-      </div>
-      <div>
-        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Exemple curl</p>
-        <pre className="bg-gray-950 text-green-400 text-xs p-3 rounded-lg overflow-x-auto whitespace-pre-wrap break-all">
-          {`curl "${apiUrl}/widget/{WIDGET_ID}/reviews"`}
-        </pre>
-      </div>
-      <div>
-        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Structure de la réponse</p>
-        <pre className="bg-gray-950 text-blue-300 text-xs p-3 rounded-lg overflow-x-auto">
-          {JSON.stringify(mockResponse, null, 2)}
-        </pre>
-      </div>
-    </div>
-  );
-}
-
-// --- Step indicator ---
-
-function StepIndicator({ current, labels }: { current: number; labels: string[] }) {
-  return (
-    <div className="flex items-center justify-center gap-0 mb-8">
-      {labels.map((label, i) => {
-        const step = i + 1;
-        const done = step < current;
-        const active = step === current;
-        return (
-          <div key={step} className="flex items-center">
-            <div className="flex flex-col items-center">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-colors ${
-                done ? 'bg-indigo-600 text-white' : active ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-500'
-              }`}>
-                {done ? '✓' : step}
-              </div>
-              <span className={`text-xs mt-1 font-medium ${active ? 'text-indigo-600' : 'text-gray-400'}`}>{label}</span>
-            </div>
-            {i < labels.length - 1 && (
-              <div className={`w-16 h-0.5 mb-5 mx-1 transition-colors ${done ? 'bg-indigo-600' : 'bg-gray-200'}`} />
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-export function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <button
-      type="button"
-      onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${checked ? 'bg-indigo-600' : 'bg-gray-200'}`}
-    >
-      <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${checked ? 'translate-x-4' : 'translate-x-0'}`} />
-    </button>
-  );
-}
-
-// --- Main component ---
-
-export default function NewWidget() {
-  const navigate = useNavigate();
-  const [widgetTypeSelection, setWidgetTypeSelection] = useState<'widget' | 'webhook' | null>(null);
-  const [step, setStep] = useState(1);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [form, setForm] = useState<FormState>({
-    name: '',
-    placeId: '',
-    placeName: '',
-    placeDescription: '',
-    ...FORM_DEFAULTS,
-  });
-
-  const [previewReviews, setPreviewReviews] = useState<Review[]>(MOCK_REVIEWS);
-  const [previewName, setPreviewName] = useState('Aperçu du widget');
-
+// ─── Place search (for Google Reviews) ────────────────────────────────────────
+function PlaceSearch({ placeId, onSelect }: { placeId: string; onSelect: (id: string, name: string) => void }) {
   const [search, setSearch] = useState('');
   const [suggestions, setSuggestions] = useState<PlacePrediction[]>([]);
   const [searching, setSearching] = useState(false);
@@ -348,48 +99,16 @@ export default function NewWidget() {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const apiUrl = import.meta.env.VITE_API_URL || window.location.origin;
-
-  const stepLabels = widgetTypeSelection === 'webhook'
-    ? ['Localisation', 'Paramètres']
-    : ['Design', 'Localisation', 'Paramètres'];
-
-  const maxStep = stepLabels.length;
-
   useEffect(() => {
-    api.get('/api/widgets').then(({ data: widgets }) => {
-      if (widgets.length > 0) {
-        fetch(`${apiUrl}/widget/${widgets[0].id}/reviews`)
-          .then(r => r.json())
-          .then(d => {
-            if (!d.error && d.reviews?.length > 0) {
-              setPreviewReviews(d.reviews);
-              setPreviewName(d.widget.name);
-            }
-          })
-          .catch(() => {});
-      }
-    }).catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setShowDropdown(false);
-      }
-    }
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) setShowDropdown(false);
+    };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  function update<K extends keyof FormState>(field: K, value: FormState[K]) {
-    setForm(f => ({ ...f, [field]: value }));
-  }
-
-  function handleSearchChange(value: string) {
+  function handleChange(value: string) {
     setSearch(value);
-    update('placeId', '');
-    update('placeName', '');
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (value.trim().length < 2) { setSuggestions([]); setShowDropdown(false); return; }
     debounceRef.current = setTimeout(async () => {
@@ -403,422 +122,193 @@ export default function NewWidget() {
     }, 350);
   }
 
-  function selectPlace(place: PlacePrediction) {
+  function select(place: PlacePrediction) {
     setSearch(place.description);
-    update('placeId', place.place_id);
-    update('placeName', place.main_text);
-    update('placeDescription', place.description);
     setSuggestions([]);
     setShowDropdown(false);
-    api.get('/api/places/reviews', { params: { placeId: place.place_id } })
-      .then(({ data }) => { if (data?.length > 0) setPreviewReviews(data); })
-      .catch(() => {});
+    onSelect(place.place_id, place.main_text);
   }
 
-  // The Localisation step is step 2 for widget, step 1 for webhook
-  const localisationStep = widgetTypeSelection === 'webhook' ? 1 : 2;
+  return (
+    <div>
+      <label className="label">Rechercher votre établissement <span className="text-red-500">*</span></label>
+      <div className="relative" ref={dropdownRef}>
+        <input className="input" type="text" value={search} onChange={e => handleChange(e.target.value)}
+          onFocus={() => suggestions.length > 0 && setShowDropdown(true)}
+          placeholder="Ex: Boulangerie Martin, Paris..." autoComplete="off" />
+        {searching && <span className="absolute right-3 top-2.5 text-gray-400 text-xs">Recherche...</span>}
+        {showDropdown && (
+          <ul className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+            {suggestions.map(place => (
+              <li key={place.place_id} onMouseDown={() => select(place)}
+                className="px-4 py-3 cursor-pointer hover:bg-brand-subtle border-b border-gray-100 last:border-0">
+                <p className="text-sm font-medium text-brand-text">{place.main_text}</p>
+                <p className="text-xs text-gray-400">{place.secondary_text}</p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      {placeId && <p className="text-xs text-green-600 mt-1">✓ Lieu sélectionné</p>}
+    </div>
+  );
+}
 
-  function nextStep() {
+// ─── Main component ────────────────────────────────────────────────────────────
+export default function NewWidget() {
+  const navigate = useNavigate();
+  const [selectedType, setSelectedType] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [widgetName, setWidgetName] = useState('');
+  const [config, setConfig] = useState<Record<string, any>>({});
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const def = selectedType ? getWidgetDef(selectedType) : null;
+
+  function selectWidget(type: string) {
+    const d = getWidgetDef(type);
+    if (!d || d.status === 'soon') return;
+    setSelectedType(type);
+    setConfig({ ...d.defaultConfig });
+    setWidgetName('');
     setError('');
-    if (step === localisationStep && !form.placeId) {
-      setError('Veuillez sélectionner un lieu dans la liste.');
-      return;
+  }
+
+  function updateConfig(key: string, value: any) {
+    setConfig(prev => ({ ...prev, [key]: value }));
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError('');
+    if (!def) return;
+    // Validate required fields
+    for (const field of def.fields) {
+      if (field.required && !config[field.key]) {
+        setError(`Le champ "${field.label}" est requis.`);
+        return;
+      }
     }
-    setStep(s => s + 1);
-  }
-
-  async function handleSubmit() {
-    setError('');
     setLoading(true);
     try {
-      const type = widgetTypeSelection === 'webhook' ? 'google_reviews_webhook' : 'google_reviews';
-      const { name, placeName, ...config } = form;
       const { data } = await api.post('/api/widgets', {
-        name: name || placeName,
-        type,
+        name: widgetName || def.name,
+        type: def.type,
         config,
       });
       navigate(`/widgets/${data.id}`);
-    } catch {
-      setError('Erreur lors de la création du widget.');
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Erreur lors de la création.');
     } finally {
       setLoading(false);
     }
   }
 
-  const previewProps = {
-    reviews: previewReviews.slice(0, form.maxReviews),
-    layout: form.layout,
-    theme: form.theme,
-    accentColor: form.accentColor,
-    widgetName: form.name || form.placeName || previewName,
-    showHeader: form.showHeader,
-    headerTitle: form.headerTitle,
-    showAvatar: form.showAvatar,
-    showDate: form.showDate,
-    truncateText: form.truncateText,
-  };
+  // ── Step 1: Catalogue ──
+  if (!selectedType) {
+    const filteredWidgets = selectedCategory
+      ? WIDGET_CATALOG.filter(w => w.category === selectedCategory)
+      : WIDGET_CATALOG;
 
-  // Localisation form block (shared between widget step 2 and webhook step 1)
-  const localisationBlock = (
-    <div className="space-y-4">
-      <div>
-        <h2 className="font-semibold text-gray-900 mb-1">Quel établissement ?</h2>
-        <p className="text-xs text-gray-400 mb-4">Recherchez votre établissement par son nom.</p>
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Lieu</label>
-        <div className="relative" ref={dropdownRef}>
-          <input
-            type="text"
-            value={search}
-            onChange={e => handleSearchChange(e.target.value)}
-            onFocus={() => suggestions.length > 0 && setShowDropdown(true)}
-            placeholder="Ex: Boulangerie Martin, Paris…"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            autoComplete="off"
-            autoFocus
-          />
-          {searching && <span className="absolute right-3 top-2.5 text-gray-400 text-xs">Recherche…</span>}
-          {showDropdown && (
-            <ul className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
-              {suggestions.map(place => (
-                <li
-                  key={place.place_id}
-                  onMouseDown={() => selectPlace(place)}
-                  className="px-4 py-3 cursor-pointer hover:bg-indigo-50 border-b border-gray-100 last:border-0"
-                >
-                  <p className="text-sm font-medium text-gray-900">{place.main_text}</p>
-                  <p className="text-xs text-gray-400">{place.secondary_text}</p>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-        {form.placeId && (
-          <p className="text-xs text-green-600 mt-1">✓ {form.placeDescription}</p>
-        )}
-      </div>
-      {error && <p className="text-red-500 text-sm bg-red-50 px-3 py-2 rounded-lg">{error}</p>}
-    </div>
-  );
-
-  // --- Type selection screen ---
-  if (widgetTypeSelection === null) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <header className="bg-white border-b border-gray-200">
-          <div className="max-w-6xl mx-auto px-4 py-4 flex items-center gap-3">
-            <Link to="/" className="text-gray-400 hover:text-gray-600 text-lg leading-none">←</Link>
-            <div>
-              <h1 className="text-lg font-bold text-gray-900">Nouveau widget</h1>
-              <p className="text-xs text-gray-400">Choisissez un type</p>
-            </div>
-          </div>
-        </header>
-        <main className="max-w-6xl mx-auto px-4 py-16">
-          <h2 className="text-xl font-semibold text-gray-900 text-center mb-2">Quel type de widget ?</h2>
-          <p className="text-sm text-gray-400 text-center mb-10">Choisissez selon votre mode d'intégration.</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-2xl mx-auto">
-            <button
-              type="button"
-              onClick={() => setWidgetTypeSelection('widget')}
-              className="text-left bg-white rounded-2xl border-2 border-gray-200 p-6 hover:border-indigo-400 hover:shadow-md transition-all group"
-            >
-              <div className="text-3xl mb-3">⭐</div>
-              <h3 className="font-semibold text-gray-900 mb-1 group-hover:text-indigo-600 transition-colors">Avis Google — Widget</h3>
-              <p className="text-xs text-gray-500 mb-3">Snippet HTML à coller dans votre site. Design personnalisable en 3 étapes.</p>
-              <ul className="text-xs text-gray-400 space-y-1">
-                <li>✓ Mise en page (liste, grille, slider…)</li>
-                <li>✓ Thème clair / sombre</li>
-                <li>✓ Aperçu en temps réel</li>
-              </ul>
-            </button>
+      <div className="p-6 max-w-6xl mx-auto">
+        <div className="flex items-center gap-3 mb-6">
+          <Link to="/" className="text-gray-400 hover:text-primary transition-colors text-lg leading-none">←</Link>
+          <h1 className="text-xl font-bold text-brand-text">Choisir un widget</h1>
+        </div>
 
+        {/* Category filter */}
+        <div className="flex gap-2 flex-wrap mb-6">
+          <button
+            onClick={() => setSelectedCategory(null)}
+            className={`px-3 py-1.5 rounded-btn text-xs font-semibold transition-all ${!selectedCategory ? 'bg-primary text-white' : 'bg-white border border-gray-200 text-brand-text hover:border-primary/40'}`}
+          >
+            Tous
+          </button>
+          {CATEGORIES.map(cat => (
             <button
-              type="button"
-              onClick={() => setWidgetTypeSelection('webhook')}
-              className="text-left bg-white rounded-2xl border-2 border-gray-200 p-6 hover:border-indigo-400 hover:shadow-md transition-all group"
+              key={cat}
+              onClick={() => setSelectedCategory(cat)}
+              className={`px-3 py-1.5 rounded-btn text-xs font-semibold transition-all ${selectedCategory === cat ? 'bg-primary text-white' : 'bg-white border border-gray-200 text-brand-text hover:border-primary/40'}`}
             >
-              <div className="text-3xl mb-3">🔗</div>
-              <h3 className="font-semibold text-gray-900 mb-1 group-hover:text-indigo-600 transition-colors">Avis Google — Webhook</h3>
-              <p className="text-xs text-gray-500 mb-3">URL API JSON brute. Pour intégration personnalisée côté développeur, en 2 étapes.</p>
-              <ul className="text-xs text-gray-400 space-y-1">
-                <li>✓ Endpoint JSON REST</li>
-                <li>✓ Aucun HTML imposé</li>
-                <li>✓ Contrôle total de l'affichage</li>
-              </ul>
+              {cat}
             </button>
-          </div>
-        </main>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+          {filteredWidgets.map(widget => (
+            <button
+              key={widget.type}
+              onClick={() => selectWidget(widget.type)}
+              disabled={widget.status === 'soon'}
+              className={`text-left card hover:shadow-md transition-all group relative ${widget.status === 'soon' ? 'opacity-60 cursor-not-allowed' : 'hover:border-primary/40 cursor-pointer'}`}
+            >
+              {widget.status === 'soon' && (
+                <span className="absolute top-3 right-3 bg-gray-100 text-gray-500 text-xs px-2 py-0.5 rounded font-semibold">Bientôt</span>
+              )}
+              <div className="text-2xl mb-2">{widget.icon}</div>
+              <div className="font-semibold text-sm text-brand-text mb-1 group-hover:text-primary transition-colors">{widget.name}</div>
+              <div className="text-xs text-gray-500 line-clamp-2">{widget.description}</div>
+              <div className="text-xs text-gray-400 mt-2 font-medium">{widget.category}</div>
+            </button>
+          ))}
+        </div>
       </div>
     );
   }
 
-  const isWidget = widgetTypeSelection === 'widget';
-
+  // ── Step 2: Config form ──
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => { setWidgetTypeSelection(null); setStep(1); setError(''); }}
-            className="text-gray-400 hover:text-gray-600 text-lg leading-none"
-          >
-            ←
-          </button>
+    <div className="p-6 max-w-4xl mx-auto">
+      <div className="flex items-center gap-3 mb-6">
+        <button onClick={() => setSelectedType(null)} className="text-gray-400 hover:text-primary transition-colors text-lg leading-none">←</button>
+        <div>
+          <h1 className="text-xl font-bold text-brand-text">{def?.icon} {def?.name}</h1>
+          <p className="text-xs text-gray-400">{def?.description}</p>
+        </div>
+      </div>
+
+      <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+        {error && <p className="text-red-600 text-sm bg-red-50 rounded-btn px-3 py-2">{error}</p>}
+
+        <div className="card flex flex-col gap-4">
           <div>
-            <h1 className="text-lg font-bold text-gray-900">Nouveau widget</h1>
-            <p className="text-xs text-gray-400">{isWidget ? 'Avis Google — Widget' : 'Avis Google — Webhook'}</p>
+            <label className="label">Nom du widget</label>
+            <input className="input" type="text" value={widgetName} onChange={e => setWidgetName(e.target.value)}
+              placeholder={`Ex: ${def?.name} — Mon site`} />
           </div>
+
+          {/* Place search for Google Reviews */}
+          {selectedType === 'google_reviews' && (
+            <PlaceSearch
+              placeId={config.placeId || ''}
+              onSelect={(id, name) => {
+                updateConfig('placeId', id);
+                if (!widgetName) setWidgetName(name);
+              }}
+            />
+          )}
+
+          {/* Generic fields */}
+          {def?.fields.filter(f => f.key !== 'placeId' || selectedType !== 'google_reviews').map(field => (
+            <FieldInput
+              key={field.key}
+              field={field}
+              value={config[field.key]}
+              onChange={v => updateConfig(field.key, v)}
+            />
+          ))}
         </div>
-      </header>
 
-      <main className="max-w-6xl mx-auto px-4 py-8">
-        <StepIndicator current={step} labels={stepLabels} />
-
-        <div className="flex flex-col xl:flex-row gap-6 items-start">
-
-          {/* Left: form */}
-          <div className="w-full xl:flex-1 min-w-0">
-            <div className="bg-white rounded-xl border border-gray-200 p-6">
-
-              {/* Widget: Étape 1 — Design */}
-              {isWidget && step === 1 && (
-                <div className="space-y-6">
-                  {/* Layout */}
-                  <div>
-                    <h2 className="font-semibold text-gray-900 mb-1">Mise en page</h2>
-                    <p className="text-xs text-gray-400 mb-4">L'aperçu se met à jour en temps réel.</p>
-                    <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
-                      {LAYOUTS.map(l => (
-                        <button
-                          key={l.value}
-                          type="button"
-                          onClick={() => update('layout', l.value)}
-                          className={`p-3 rounded-lg border-2 text-left transition-all ${
-                            form.layout === l.value ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:border-gray-300'
-                          }`}
-                        >
-                          <p className={`text-xs font-semibold ${form.layout === l.value ? 'text-indigo-600' : 'text-gray-700'}`}>{l.label}</p>
-                          <p className="text-xs text-gray-400 mt-0.5">{l.desc}</p>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Theme + color */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Thème</label>
-                      <div className="grid grid-cols-2 gap-2">
-                        {[{ value: 'light', label: 'Clair' }, { value: 'dark', label: 'Sombre' }].map(t => (
-                          <button
-                            key={t.value}
-                            type="button"
-                            onClick={() => update('theme', t.value)}
-                            className={`p-2 rounded-lg border-2 text-xs font-medium transition-all ${
-                              form.theme === t.value ? 'border-indigo-500 bg-indigo-50 text-indigo-600' : 'border-gray-200 text-gray-600 hover:border-gray-300'
-                            }`}
-                          >
-                            {t.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Couleur accent</label>
-                      <div className="flex gap-2">
-                        <input type="color" value={form.accentColor} onChange={e => update('accentColor', e.target.value)}
-                          className="h-9 w-10 border border-gray-300 rounded-lg cursor-pointer p-0.5" />
-                        <input type="text" value={form.accentColor} onChange={e => update('accentColor', e.target.value)}
-                          className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono" />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Header design */}
-                  <div className="border-t border-gray-100 pt-5">
-                    <h3 className="text-sm font-semibold text-gray-800 mb-3">Design de l'en-tête</h3>
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <label className="text-sm text-gray-600">Afficher l'en-tête</label>
-                        <Toggle checked={form.showHeader} onChange={v => update('showHeader', v)} />
-                      </div>
-                      {form.showHeader && (
-                        <div>
-                          <label className="block text-xs text-gray-500 mb-1">Titre personnalisé</label>
-                          <input
-                            type="text"
-                            value={form.headerTitle}
-                            onChange={e => update('headerTitle', e.target.value)}
-                            placeholder="Laissez vide pour utiliser le nom du widget"
-                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Reviews design */}
-                  {form.layout !== 'badge' && (
-                    <div className="border-t border-gray-100 pt-5">
-                      <h3 className="text-sm font-semibold text-gray-800 mb-3">Design des avis</h3>
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <label className="text-sm text-gray-600">Afficher les avatars</label>
-                          <Toggle checked={form.showAvatar} onChange={v => update('showAvatar', v)} />
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <label className="text-sm text-gray-600">Afficher la date</label>
-                          <Toggle checked={form.showDate} onChange={v => update('showDate', v)} />
-                        </div>
-                        {(form.layout === 'list' || form.layout === 'grid' || form.layout === 'slider') && (
-                          <div className="flex items-center justify-between">
-                            <label className="text-sm text-gray-600">Tronquer le texte long</label>
-                            <Toggle checked={form.truncateText} onChange={v => update('truncateText', v)} />
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Mobile preview */}
-                  <div className="xl:hidden border-t border-gray-100 pt-5">
-                    <p className="text-xs text-gray-500 mb-3 font-medium uppercase tracking-wide">Aperçu</p>
-                    <div className="bg-gray-100 rounded-xl p-5 border border-dashed border-gray-300">
-                      <LivePreview {...previewProps} />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Localisation step (widget step 2 OR webhook step 1) */}
-              {step === localisationStep && localisationBlock}
-
-              {/* Paramètres step (widget step 3 OR webhook step 2) */}
-              {((isWidget && step === 3) || (!isWidget && step === 2)) && (
-                <div className="space-y-5">
-                  <div>
-                    <h2 className="font-semibold text-gray-900 mb-1">Paramètres</h2>
-                    <p className="text-xs text-gray-400 mb-4">Tous les champs sont optionnels.</p>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Nom du widget</label>
-                    <input
-                      type="text"
-                      value={form.name}
-                      onChange={e => update('name', e.target.value)}
-                      placeholder={form.placeName || 'Ex: Avis Google — Mon Restaurant'}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    />
-                    <p className="text-xs text-gray-400 mt-1">Si vide, le nom du lieu sera utilisé.</p>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Nombre d'avis max</label>
-                      <select
-                        value={form.maxReviews}
-                        onChange={e => update('maxReviews', parseInt(e.target.value))}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      >
-                        {[3, 5, 10].map(n => <option key={n} value={n}>{n} avis</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Note minimale</label>
-                      <select
-                        value={form.minRating}
-                        onChange={e => update('minRating', parseInt(e.target.value))}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      >
-                        {[1, 2, 3, 4, 5].map(n => <option key={n} value={n}>{n}★ et +</option>)}
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Language — webhook only */}
-                  {!isWidget && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Langue des avis</label>
-                      <select
-                        value={form.language}
-                        onChange={e => update('language', e.target.value)}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      >
-                        {LANGUAGES.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
-                      </select>
-                    </div>
-                  )}
-
-                  {error && <p className="text-red-500 text-sm bg-red-50 px-3 py-2 rounded-lg">{error}</p>}
-                </div>
-              )}
-
-              {/* Navigation */}
-              <div className="flex justify-between items-center mt-6 pt-5 border-t border-gray-100">
-                {step > 1 ? (
-                  <button type="button" onClick={() => setStep(s => s - 1)} className="text-sm text-gray-500 hover:text-gray-700">
-                    ← Précédent
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => { setWidgetTypeSelection(null); setStep(1); setError(''); }}
-                    className="text-sm text-gray-500 hover:text-gray-700"
-                  >
-                    Annuler
-                  </button>
-                )}
-
-                {step < maxStep ? (
-                  <button
-                    type="button"
-                    onClick={nextStep}
-                    className="bg-indigo-600 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
-                  >
-                    Suivant →
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={handleSubmit}
-                    disabled={loading}
-                    className="bg-indigo-600 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors"
-                  >
-                    {loading ? 'Création…' : isWidget ? 'Créer le widget' : 'Créer le webhook'}
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Right: sticky preview (xl screens) */}
-          <div className="hidden xl:block xl:w-96 flex-shrink-0">
-            <div className="sticky top-6">
-              {isWidget ? (
-                <>
-                  <p className="text-xs text-gray-500 mb-3 font-medium uppercase tracking-wide">Aperçu en temps réel</p>
-                  <div className="bg-gray-100 rounded-xl p-5 border border-dashed border-gray-300">
-                    <LivePreview {...previewProps} />
-                  </div>
-                </>
-              ) : (
-                <>
-                  <p className="text-xs text-gray-500 mb-3 font-medium uppercase tracking-wide">Endpoint JSON</p>
-                  <div className="bg-white rounded-xl border border-gray-200 p-5">
-                    <WebhookInfoPanel apiUrl={apiUrl} />
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-
+        <div className="flex justify-end gap-3">
+          <button type="button" onClick={() => setSelectedType(null)} className="btn-secondary">Annuler</button>
+          <button type="submit" disabled={loading} className="btn-primary">
+            {loading ? 'Création...' : 'Créer le widget'}
+          </button>
         </div>
-      </main>
+      </form>
     </div>
   );
 }
