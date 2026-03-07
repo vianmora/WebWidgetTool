@@ -207,15 +207,27 @@ export default function NewWidget() {
 
   // ── Step 1: Catalogue ──
   if (!selectedType) {
-    const filteredWidgets = selectedCategory
-      ? WIDGET_CATALOG.filter(w => w.category === selectedCategory)
-      : WIDGET_CATALOG;
+    const widgetCard = (widget: typeof WIDGET_CATALOG[0]) => (
+      <button
+        key={widget.type}
+        onClick={() => selectWidget(widget.type)}
+        disabled={widget.status === 'soon'}
+        className={`text-left card hover:shadow-md transition-all group relative ${widget.status === 'soon' ? 'opacity-60 cursor-not-allowed' : 'hover:border-primary/40 cursor-pointer'}`}
+      >
+        {widget.status === 'soon' && (
+          <span className="absolute top-3 right-3 bg-gray-100 text-gray-500 text-xs px-2 py-0.5 rounded font-semibold">Bientôt</span>
+        )}
+        <div className="text-2xl mb-2">{widget.icon}</div>
+        <div className="font-semibold text-sm text-brand-text mb-1 group-hover:text-primary transition-colors">{widget.name}</div>
+        <div className="text-xs text-gray-500 line-clamp-2">{widget.description}</div>
+      </button>
+    );
 
     return (
       <div className="p-6 max-w-6xl mx-auto">
         <div className="flex items-center gap-3 mb-6">
           <Link to="/" className="text-gray-400 hover:text-primary transition-colors text-lg leading-none">←</Link>
-          <h1 className="text-xl font-bold text-brand-text">Choisir un widget</h1>
+          <h1 className="text-xl font-bold text-brand-text">Tous les widgets</h1>
         </div>
 
         {/* Category filter */}
@@ -237,24 +249,30 @@ export default function NewWidget() {
           ))}
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-          {filteredWidgets.map(widget => (
-            <button
-              key={widget.type}
-              onClick={() => selectWidget(widget.type)}
-              disabled={widget.status === 'soon'}
-              className={`text-left card hover:shadow-md transition-all group relative ${widget.status === 'soon' ? 'opacity-60 cursor-not-allowed' : 'hover:border-primary/40 cursor-pointer'}`}
-            >
-              {widget.status === 'soon' && (
-                <span className="absolute top-3 right-3 bg-gray-100 text-gray-500 text-xs px-2 py-0.5 rounded font-semibold">Bientôt</span>
-              )}
-              <div className="text-2xl mb-2">{widget.icon}</div>
-              <div className="font-semibold text-sm text-brand-text mb-1 group-hover:text-primary transition-colors">{widget.name}</div>
-              <div className="text-xs text-gray-500 line-clamp-2">{widget.description}</div>
-              <div className="text-xs text-gray-400 mt-2 font-medium">{widget.category}</div>
-            </button>
-          ))}
-        </div>
+        {/* Grouped by category when no filter, flat list when filtered */}
+        {selectedCategory ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+            {WIDGET_CATALOG.filter(w => w.category === selectedCategory).map(widgetCard)}
+          </div>
+        ) : (
+          <div className="flex flex-col gap-8">
+            {CATEGORIES.map(cat => {
+              const widgets = WIDGET_CATALOG.filter(w => w.category === cat);
+              if (widgets.length === 0) return null;
+              return (
+                <div key={cat}>
+                  <div className="flex items-center gap-3 mb-3">
+                    <h2 className="text-sm font-semibold text-brand-text">{cat}</h2>
+                    <div className="flex-1 h-px bg-gray-200" />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                    {widgets.map(widgetCard)}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     );
   }

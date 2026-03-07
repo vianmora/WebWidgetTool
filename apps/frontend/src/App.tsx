@@ -10,6 +10,7 @@ import NewWidget from './pages/NewWidget';
 import WidgetDetail from './pages/WidgetDetail';
 import Billing from './pages/Billing';
 import Admin from './pages/Admin';
+import Settings from './pages/Settings';
 
 function PrivateRoute({ children, adminOnly = false }: { children: React.ReactNode; adminOnly?: boolean }) {
   const { user, loading } = useUser();
@@ -44,6 +45,7 @@ function AppRoutes() {
       <Route path="/widgets/new" element={<PrivateRoute><AppLayout><NewWidget /></AppLayout></PrivateRoute>} />
       <Route path="/widgets/:id" element={<PrivateRoute><AppLayout><WidgetDetail /></AppLayout></PrivateRoute>} />
       <Route path="/billing" element={<PrivateRoute><AppLayout><Billing /></AppLayout></PrivateRoute>} />
+      <Route path="/settings" element={<PrivateRoute><AppLayout><Settings /></AppLayout></PrivateRoute>} />
       <Route path="/admin" element={<PrivateRoute adminOnly><AppLayout><Admin /></AppLayout></PrivateRoute>} />
 
       <Route path="*" element={<Navigate to="/" replace />} />

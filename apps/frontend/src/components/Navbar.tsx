@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
 
+const IS_SAAS = import.meta.env.VITE_APP_MODE === 'saas';
+
 const PLAN_LABELS: Record<string, string> = {
   free: 'Gratuit', starter: 'Starter', pro: 'Pro', agency: 'Agency', admin: 'Admin',
 };
@@ -19,7 +21,7 @@ export default function Navbar() {
 
       <nav className="hidden md:flex items-center gap-4 flex-1 text-sm">
         <Link to="/" className="opacity-80 hover:opacity-100 transition-opacity">Dashboard</Link>
-        <Link to="/widgets/new" className="opacity-80 hover:opacity-100 transition-opacity">Nouveau widget</Link>
+        <Link to="/widgets/new" className="opacity-80 hover:opacity-100 transition-opacity">Tous les widgets</Link>
       </nav>
 
       {user && (
@@ -42,12 +44,21 @@ export default function Navbar() {
               className="absolute right-0 top-full mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50 py-1"
               onBlur={() => setMenuOpen(false)}
             >
-              <button
-                onClick={() => { navigate('/billing'); setMenuOpen(false); }}
-                className="w-full text-left px-4 py-2 text-sm text-brand-text hover:bg-brand-subtle"
-              >
-                Facturation
-              </button>
+              {IS_SAAS ? (
+                <button
+                  onClick={() => { navigate('/billing'); setMenuOpen(false); }}
+                  className="w-full text-left px-4 py-2 text-sm text-brand-text hover:bg-brand-subtle"
+                >
+                  Facturation
+                </button>
+              ) : (
+                <button
+                  onClick={() => { navigate('/settings'); setMenuOpen(false); }}
+                  className="w-full text-left px-4 py-2 text-sm text-brand-text hover:bg-brand-subtle"
+                >
+                  Paramètres
+                </button>
+              )}
               {user.email === (window as any).__SUPERADMIN_EMAIL__ && (
                 <button
                   onClick={() => { navigate('/admin'); setMenuOpen(false); }}
