@@ -132,7 +132,7 @@ router.post('/webhook', async (req: Request, res: Response) => {
       if (invoice.customer_email) {
         await sendMail({
           to: invoice.customer_email,
-          subject: 'Paiement échoué — WebWidget',
+          subject: 'Paiement échoué — WebWidgetTool',
           html: `
             <div style="font-family:sans-serif;padding:40px;max-width:520px">
               <h2 style="color:#621B7A">Paiement échoué</h2>

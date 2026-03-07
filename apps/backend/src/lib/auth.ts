@@ -15,7 +15,7 @@ export const auth = betterAuth({
     sendResetPassword: async ({ user, url }) => {
       await sendMail({
         to: user.email,
-        subject: 'Réinitialisation de votre mot de passe WebWidget',
+        subject: 'Réinitialisation de votre mot de passe WebWidgetTool',
         html: passwordResetTemplate(url),
       });
     },
@@ -26,14 +26,14 @@ export const auth = betterAuth({
     sendVerificationEmail: async ({ user, url }) => {
       await sendMail({
         to: user.email,
-        subject: 'Vérifiez votre adresse email WebWidget',
+        subject: 'Vérifiez votre adresse email WebWidgetTool',
         html: emailVerificationTemplate(url),
       });
     },
     afterEmailVerification: async (user) => {
       await sendMail({
         to: user.email,
-        subject: 'Bienvenue sur WebWidget !',
+        subject: 'Bienvenue sur WebWidgetTool !',
         html: welcomeTemplate(user.email),
       });
     },

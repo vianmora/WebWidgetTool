@@ -31,7 +31,7 @@ export default function ResetPassword() {
     <div className="min-h-screen bg-brand-subtle flex items-center justify-center p-4">
       <div className="bg-white rounded-lg border border-gray-200 p-8 w-full max-w-sm">
         <div className="text-center mb-6">
-          <div className="font-bold text-xl text-primary mb-1">WebWidget</div>
+          <img src="/logo.png" alt="WebWidgetTool" className="h-10 w-auto mx-auto mb-2" />
           <h1 className="text-lg font-bold text-brand-text">Nouveau mot de passe</h1>
         </div>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">

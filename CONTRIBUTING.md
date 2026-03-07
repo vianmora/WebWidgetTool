@@ -1,6 +1,6 @@
 # Guide de contribution
 
-Merci de votre interet pour WebWidget Tool. Ce document explique comment contribuer au projet.
+Merci de votre interet pour WebWidgetTool. Ce document explique comment contribuer au projet.
 
 ---
 

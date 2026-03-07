@@ -1,6 +1,6 @@
 # Guide d'auto-hebergement
 
-Ce guide couvre l'installation de WebWidget Tool sur votre propre serveur.
+Ce guide couvre l'installation de WebWidgetTool sur votre propre serveur.
 
 ---
 

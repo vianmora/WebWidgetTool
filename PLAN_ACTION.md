@@ -1,4 +1,4 @@
-# Plan d'action — WebWidget Tool v2
+# Plan d'action — WebWidgetTool v2
 
 ## Vue d'ensemble
 
@@ -49,7 +49,7 @@ SMTP_PORT=587
 SMTP_SECURE=false
 SMTP_USER=
 SMTP_PASS=
-SMTP_FROM="WebWidget <noreply@mondomaine.com>"
+SMTP_FROM="WebWidgetTool <noreply@mondomaine.com>"
 ```
 
 Créer `src/lib/mailer.ts` : instance Nodemailer configurée depuis ces variables, avec méthode `sendMail({ to, subject, html })`.
@@ -557,7 +557,7 @@ SMTP_PORT=587
 SMTP_SECURE=false
 SMTP_USER=
 SMTP_PASS=
-SMTP_FROM="WebWidget <noreply@mondomaine.com>"
+SMTP_FROM="WebWidgetTool <noreply@mondomaine.com>"
 
 # Superadmin (SaaS)
 SUPERADMIN_EMAIL=

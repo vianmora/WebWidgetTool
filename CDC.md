@@ -1,8 +1,8 @@
-# Cahier des charges — WebWidget Tool v2
+# Cahier des charges — WebWidgetTool v2
 
 ## 1. Vision & objectifs
 
-Faire évoluer WebWidget Tool de son état actuel (outil mono-admin auto-hébergé, un seul widget Google Reviews) vers une plateforme de widgets intégrables à deux modes de fonctionnement :
+Faire évoluer WebWidgetTool de son état actuel (outil mono-admin auto-hébergé, un seul widget Google Reviews) vers une plateforme de widgets intégrables à deux modes de fonctionnement :
 
 - **Mode SaaS** : hébergé sur un domaine central, vendu en abonnement à des utilisateurs finaux (agences, TPE/PME, indépendants)
 - **Mode self-hosted** : inchangé dans l'esprit, un seul compte admin via variables d'environnement, toutes les fonctionnalités disponibles sans restriction
@@ -246,7 +246,7 @@ Chaque widget a un `type` (string) et un `config` (JSONB) spécifique. Ci-dessou
 - Fichier unique servi par le backend (comme aujourd'hui)
 - Supporte plusieurs widgets sur la même page (`data-widget-id` par balise)
 - Injecte son propre CSS en shadow DOM ou namespaced pour éviter les conflits
-- Badge "Powered by WebWidget" conditionnel selon le plan de l'utilisateur
+- Badge "Powered by WebWidgetTool" conditionnel selon le plan de l'utilisateur
 - Chargement asynchrone, non-bloquant
 
 ---

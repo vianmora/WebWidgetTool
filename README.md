@@ -1,4 +1,4 @@
-# WebWidget Tool
+# WebWidgetTool
 
 Créez et intégrez des widgets interactifs sur n'importe quel site en une ligne de code. Open-source, auto-hébergeable, disponible en SaaS.
 

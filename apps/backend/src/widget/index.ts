@@ -107,4 +107,4 @@ if (document.readyState === 'loading') {
 }
 
 // Also expose for dynamic usage
-(window as any).WebWidget = { init: initWidget, initAll };
+(window as any).WebWidgetTool = { init: initWidget, initAll };

@@ -13,8 +13,8 @@ export default function Navbar() {
 
   return (
     <header className="bg-primary text-white h-14 flex items-center px-6 gap-6 shrink-0">
-      <Link to="/" className="font-bold text-lg tracking-tight text-white">
-        WebWidget
+      <Link to="/" className="flex items-center">
+        <img src="/logo-white.png" alt="WebWidgetTool" className="h-7 w-auto" />
       </Link>
 
       <nav className="hidden md:flex items-center gap-4 flex-1 text-sm">
