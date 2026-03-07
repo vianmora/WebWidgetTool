@@ -28,7 +28,7 @@ export default function ResetPassword() {
   };
 
   return (
-    <div className="min-h-screen bg-brand-subtle flex items-center justify-center p-4">
+    <div className="min-h-screen bg-brand-subtle flex flex-col items-center justify-center p-4">
       <div className="bg-white rounded-lg border border-gray-200 w-full max-w-sm overflow-hidden">
         <div className="px-8 pt-6 pb-5">
           <img src="/logo.png" alt="WebWidgetTool" className="h-8 w-auto" />
