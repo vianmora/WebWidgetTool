@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import api from '../lib/api';
 
 // ── Mock data ──────────────────────────────────────────────────────────────────
 const MOCK_REVIEWS = [
@@ -40,6 +41,39 @@ function Stars({ rating, color }: { rating: number; color: string }) {
 
 // ── Main component ─────────────────────────────────────────────────────────────
 export default function WidgetLivePreview({ type, config }: { type: string; config: Record<string, any> }) {
+  // Fetch real Google Reviews when placeId is set
+  const [liveReviews, setLiveReviews] = useState<typeof MOCK_REVIEWS | null>(null);
+  const [loadingReviews, setLoadingReviews] = useState(false);
+  const apiBase = import.meta.env.VITE_API_URL || '';
+
+  useEffect(() => {
+    if (type !== 'google_reviews' || !config.placeId) {
+      setLiveReviews(null);
+      return;
+    }
+    setLoadingReviews(true);
+    api.get('/api/places/reviews', { params: { placeId: config.placeId } })
+      .then(({ data }) => {
+        const minRating = Number(config.minRating ?? 1);
+        const maxReviews = Number(config.maxReviews ?? 5);
+        const filtered = (data as any[])
+          .filter(r => r.rating >= minRating)
+          .slice(0, maxReviews)
+          .map(r => ({
+            name: r.author_name,
+            rating: r.rating,
+            text: r.text || '',
+            photoUrl: r.profile_photo_url
+              ? `${apiBase}/widget/image?url=${encodeURIComponent(r.profile_photo_url)}`
+              : '',
+            ago: r.relative_time_description || '',
+          }));
+        setLiveReviews(filtered.length > 0 ? filtered : null);
+      })
+      .catch(() => setLiveReviews(null))
+      .finally(() => setLoadingReviews(false));
+  }, [type, config.placeId, config.minRating, config.maxReviews]);
+
   const isDark = config.theme === 'dark';
   const accent = config.accentColor || '#621B7A';
   const layout = config.layout || 'list';
@@ -59,23 +93,34 @@ export default function WidgetLivePreview({ type, config }: { type: string; conf
   // ── Google Reviews / Testimonials ────────────────────────────────────────────
   if (type === 'google_reviews' || type === 'testimonials') {
     const isReviews = type === 'google_reviews';
-    const cards = MOCK_REVIEWS.slice(0, layout === 'grid' ? 4 : 3);
 
-    const ReviewCard = ({ r }: { r: typeof MOCK_REVIEWS[0] }) => (
+    // Use real reviews if available, otherwise mock data
+    type ReviewItem = { name: string; rating: number; text: string; photoUrl?: string; ago?: string };
+    const displayReviews: ReviewItem[] = isReviews && liveReviews
+      ? liveReviews
+      : MOCK_REVIEWS.map(r => ({ ...r, photoUrl: '' }));
+    const cards = displayReviews.slice(0, layout === 'grid' ? 4 : 3);
+
+    const ReviewCard = ({ r }: { r: ReviewItem }) => (
       <div style={{ background: cardBg, borderRadius: 8, padding: layout === 'grid' ? 12 : 14, border: `1px solid ${border}`, ...(layout === 'list' ? { display: 'flex', gap: 12 } : {}) }}>
         {layout === 'list' ? (
           <>
-            <Avatar name={r.name} size={36} />
+            {r.photoUrl
+              ? <img src={r.photoUrl} alt={r.name} style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+              : <Avatar name={r.name} size={36} />}
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontWeight: 600, fontSize: 13 }}>{r.name}</div>
               <Stars rating={r.rating} color={accent} />
+              {r.ago && <div style={{ fontSize: 11, color: textSub }}>{r.ago}</div>}
               <div style={{ fontSize: 12, color: textSub, marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.text}</div>
             </div>
           </>
         ) : (
           <>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-              <Avatar name={r.name} size={26} />
+              {r.photoUrl
+                ? <img src={r.photoUrl} alt={r.name} style={{ width: 26, height: 26, borderRadius: '50%', objectFit: 'cover' }} />
+                : <Avatar name={r.name} size={26} />}
               <div style={{ fontWeight: 600, fontSize: 12 }}>{r.name}</div>
             </div>
             <Stars rating={r.rating} color={accent} />
@@ -89,10 +134,13 @@ export default function WidgetLivePreview({ type, config }: { type: string; conf
       <div style={wrap}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, paddingBottom: 14, borderBottom: `1px solid ${border}` }}>
           <div style={{ width: 32, height: 32, background: accent, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>⭐</div>
-          <div>
+          <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 700, fontSize: 15 }}>{isReviews ? 'Google Reviews' : 'Témoignages'}</div>
-            <div style={{ fontSize: 12, color: textSub }}>4.8 ★ · 124 avis</div>
+            <div style={{ fontSize: 12, color: textSub }}>
+              {isReviews && liveReviews ? `${liveReviews.length} avis chargés` : '4.8 ★ · aperçu'}
+            </div>
           </div>
+          {isReviews && loadingReviews && <div style={{ fontSize: 11, color: textSub }}>Chargement...</div>}
         </div>
         <div style={layout === 'grid' ? { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 } : { display: 'flex', flexDirection: 'column', gap: 10 }}>
           {cards.map((r, i) => <ReviewCard key={i} r={r} />)}

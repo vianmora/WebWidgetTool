@@ -13,7 +13,10 @@ export default defineConfig({
     },
     proxy: {
       '/api': { target: backendUrl, changeOrigin: true },
-      '/widget': { target: backendUrl, changeOrigin: true },
+      // Regex keys: only match /widget.js and /widget/* — NOT /widgets/* (SPA routes)
+      // No changeOrigin so req.get('host') stays localhost:3000 → image proxy URLs work from browser
+      '^/widget\\.js': { target: backendUrl },
+      '^/widget/': { target: backendUrl },
     },
   },
 });
