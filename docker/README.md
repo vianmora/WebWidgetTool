@@ -25,7 +25,7 @@ docker compose -f docker/compose.dev.yml up -d
 ```
 
 - Backend sur `http://localhost:4000` (hot-reload via ts-node-dev)
-- Frontend sur `http://localhost:5173` (hot-reload via Vite)
+- Frontend sur `http://localhost:3000` (hot-reload via Vite)
 - Modifier un fichier source → rechargement automatique, pas de rebuild
 
 ---

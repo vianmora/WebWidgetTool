@@ -41,7 +41,7 @@ services:
       - ../.env
     environment:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/widgets
-      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
     volumes:
       - ../apps/backend:/app
       - backend_modules:/app/node_modules
@@ -63,7 +63,7 @@ services:
       - ../apps/frontend:/app
       - frontend_modules:/app/node_modules
     ports:
-      - "5173:5173"
+      - "3000:3000"
     depends_on:
       - backend
     restart: unless-stopped
