@@ -242,7 +242,7 @@ export default function NewWidget() {
     const widgetCard = (widget: typeof WIDGET_CATALOG[0]) => (
       <div key={widget.type} className="relative">
         <button
-          onClick={() => widget.status !== 'soon' && !widget.apiWidget && selectWidget(widget.type)}
+          onClick={() => widget.status !== 'soon' && selectWidget(widget.type)}
           disabled={widget.status === 'soon'}
           className={`w-full text-left card hover:shadow-md transition-all group relative ${widget.status === 'soon' ? 'opacity-60 cursor-not-allowed' : 'hover:border-primary/40 cursor-pointer'}`}
         >
