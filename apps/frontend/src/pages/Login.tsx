@@ -39,44 +39,50 @@ export default function Login() {
 
   return (
     <div className="min-h-screen bg-brand-subtle flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg border border-gray-200 p-8 w-full max-w-sm">
-        <div className="text-center mb-6">
-          <img src="/logo.png" alt="WebWidgetTool" className="h-10 w-auto mx-auto mb-2" />
-          <h1 className="text-lg font-bold text-brand-text">Connexion</h1>
-          {params.get('reset') && (
-            <p className="text-sm text-green-600 mt-2 bg-green-50 rounded-btn px-3 py-1.5">Mot de passe mis à jour. Connectez-vous.</p>
-          )}
+      <div className="bg-white rounded-lg border border-gray-200 w-full max-w-sm overflow-hidden">
+        <div className="px-8 pt-6 pb-5">
+          <img src="/logo.png" alt="WebWidgetTool" className="h-8 w-auto" />
         </div>
+        <hr className="border-gray-200" />
+        <div className="px-8 pt-6 pb-4">
+          <h1 className="text-lg font-bold text-brand-text mb-6">Connexion</h1>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          {error && <p className="text-red-600 text-sm bg-red-50 rounded-btn px-3 py-2">{error}</p>}
+          {params.get('reset') && (
+            <p className="text-sm text-green-600 mb-4 bg-green-50 rounded-btn px-3 py-1.5">Mot de passe mis à jour. Connectez-vous.</p>
+          )}
 
-          <div>
-            <label className="label">Email</label>
-            <input className="input" type="email" value={email} onChange={e => setEmail(e.target.value)} required autoFocus placeholder="vous@exemple.com" />
-          </div>
-          <div>
-            <label className="label">Mot de passe</label>
-            <input className="input" type="password" value={password} onChange={e => setPassword(e.target.value)} required />
-          </div>
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            {error && <p className="text-red-600 text-sm bg-red-50 rounded-btn px-3 py-2">{error}</p>}
+
+            <div>
+              <label className="label">Email</label>
+              <input className="input" type="email" value={email} onChange={e => setEmail(e.target.value)} required autoFocus placeholder="vous@exemple.com" />
+            </div>
+            <div>
+              <label className="label">Mot de passe</label>
+              <input className="input" type="password" value={password} onChange={e => setPassword(e.target.value)} required />
+            </div>
+
+            {IS_SAAS && (
+              <div className="text-right">
+                <Link to="/forgot-password" className="text-xs text-primary hover:underline">Mot de passe oublié ?</Link>
+              </div>
+            )}
+
+            <button type="submit" disabled={loading} className="btn-primary w-full mt-1">
+              {loading ? 'Connexion...' : 'Se connecter'}
+            </button>
+          </form>
 
           {IS_SAAS && (
-            <div className="text-right">
-              <Link to="/forgot-password" className="text-xs text-primary hover:underline">Mot de passe oublié ?</Link>
-            </div>
+            <p className="text-center text-sm text-gray-500 mt-4">
+              Pas encore de compte ?{' '}
+              <Link to="/register" className="text-primary font-semibold hover:underline">Créer un compte</Link>
+            </p>
           )}
-
-          <button type="submit" disabled={loading} className="btn-primary w-full mt-1">
-            {loading ? 'Connexion...' : 'Se connecter'}
-          </button>
-        </form>
-
-        {IS_SAAS && (
-          <p className="text-center text-sm text-gray-500 mt-4">
-            Pas encore de compte ?{' '}
-            <Link to="/register" className="text-primary font-semibold hover:underline">Créer un compte</Link>
-          </p>
-        )}
+        </div>
+        <hr className="border-gray-200" />
+        <p className="text-center text-xs text-gray-400 py-3">Propulsé par WebWidgetTool</p>
       </div>
     </div>
   );
