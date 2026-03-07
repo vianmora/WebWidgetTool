@@ -74,6 +74,28 @@ router.get('/:id', async (req: AuthRequest, res) => {
   }
 });
 
+router.get('/:id/stats', async (req: AuthRequest, res) => {
+  try {
+    const widget = await prisma.widget.findUnique({ where: { id: req.params.id } });
+    if (!widget || (isSaaS() && widget.userId !== req.user!.id)) {
+      res.status(404).json({ error: 'Widget introuvable.' });
+      return;
+    }
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const [monthAgg, totalAgg] = await Promise.all([
+      prisma.widgetView.aggregate({ where: { widgetId: req.params.id, date: { gte: startOfMonth } }, _sum: { count: true } }),
+      prisma.widgetView.aggregate({ where: { widgetId: req.params.id }, _sum: { count: true } }),
+    ]);
+    res.json({
+      viewsThisMonth: monthAgg._sum.count ?? 0,
+      viewsTotal: totalAgg._sum.count ?? 0,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.patch('/:id', async (req: AuthRequest, res) => {
   try {
     // Ownership check in SaaS mode

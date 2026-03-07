@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import api from '../lib/api';
 import { WIDGET_CATALOG, CATEGORIES, getWidgetDef, FieldDefinition } from '../data/widgetCatalog';
+import WidgetLivePreview from '../components/WidgetLivePreview';
 
 type Step = 'catalog' | 'template' | 'config';
 
@@ -787,15 +788,13 @@ export default function NewWidget() {
           </div>
         </form>
 
-        {/* Right: template preview */}
-        <div className="hidden lg:flex flex-col items-center sticky top-6">
-          <TemplateThumbnail
-            type={selectedType!}
-            templateId={activeTemplateId}
-            className="w-full h-auto rounded-xl shadow-md border border-gray-100"
-          />
+        {/* Right: live preview */}
+        <div className="hidden lg:block sticky top-6">
+          <div className="card p-3 overflow-hidden">
+            <WidgetLivePreview type={selectedType!} config={config} />
+          </div>
           {templates[selectedTemplateIdx] && (
-            <p className="text-xs text-gray-400 mt-3">{templates[selectedTemplateIdx].label}</p>
+            <p className="text-xs text-gray-400 mt-2 text-center">{templates[selectedTemplateIdx].label}</p>
           )}
         </div>
       </div>
