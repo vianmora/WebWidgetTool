@@ -77,9 +77,8 @@ export default function Register() {
             <Link to="/login" className="text-primary font-semibold hover:underline">Se connecter</Link>
           </p>
         </div>
-        <hr className="border-gray-200" />
-        <p className="text-center text-xs text-gray-400 py-3">Propulsé par WebWidgetTool</p>
       </div>
+      <p className="text-center text-xs text-gray-400 mt-4">Propulsé par WebWidgetTool</p>
     </div>
   );
 }
