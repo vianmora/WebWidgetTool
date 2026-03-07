@@ -7,6 +7,7 @@ export interface WidgetDefinition {
   status: 'available' | 'soon';
   defaultConfig: Record<string, any>;
   fields: FieldDefinition[];
+  apiWidget?: boolean; // expose a /widget/:id/data endpoint usable as webhook
 }
 
 export interface FieldDefinition {
@@ -30,6 +31,7 @@ export const WIDGET_CATALOG: WidgetDefinition[] = [
     category: 'Avis & Témoignages',
     icon: '⭐',
     status: 'available',
+    apiWidget: true,
     defaultConfig: { placeId: '', maxReviews: 5, minRating: 4, theme: 'light', accentColor: '#621B7A', layout: 'list', language: 'fr' },
     fields: [
       { key: 'placeId', label: 'Google Place ID', type: 'text', placeholder: 'ChIJ...', required: true, help: 'Trouvez votre Place ID sur Google Maps Platform' },

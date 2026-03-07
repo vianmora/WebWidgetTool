@@ -90,31 +90,46 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-function SnippetTabs({ widgetId }: { widgetId: string }) {
-  const [tab, setTab] = useState<'html' | 'wordpress' | 'webflow'>('html');
-  const apiUrl = import.meta.env.VITE_API_URL || '';
+function SnippetTabs({ widgetId, isApiWidget }: { widgetId: string; isApiWidget: boolean }) {
+  const [tab, setTab] = useState<'html' | 'wordpress' | 'webflow' | 'webhook'>('html');
+  const baseUrl = import.meta.env.VITE_API_URL || window.location.origin;
 
-  const htmlSnippet = `<div data-ww-id="${widgetId}"></div>\n<script src="${apiUrl || window.location.origin}/widget.js" async></script>`;
+  const htmlSnippet = `<div data-ww-id="${widgetId}"></div>\n<script src="${baseUrl}/widget.js" async></script>`;
   const wpSnippet = `[webwidget id="${widgetId}"]`;
-  const webflowSnippet = `<!-- Coller dans "Before </body> tag" dans les paramètres du site Webflow -->\n<script src="${apiUrl || window.location.origin}/widget.js" async></script>\n\n<!-- Coller dans un élément "Embed" à l'endroit souhaité -->\n<div data-ww-id="${widgetId}"></div>`;
+  const webflowSnippet = `<!-- Coller dans "Before </body> tag" dans les paramètres du site Webflow -->\n<script src="${baseUrl}/widget.js" async></script>\n\n<!-- Coller dans un élément "Embed" à l'endroit souhaité -->\n<div data-ww-id="${widgetId}"></div>`;
+  const webhookSnippet = `GET ${baseUrl}/widget/${widgetId}/data`;
 
-  const snippets = { html: htmlSnippet, wordpress: wpSnippet, webflow: webflowSnippet };
-  const tabLabels = { html: 'HTML', wordpress: 'WordPress', webflow: 'Webflow' };
+  const allTabs = isApiWidget
+    ? (['html', 'wordpress', 'webflow', 'webhook'] as const)
+    : (['html', 'wordpress', 'webflow'] as const);
+
+  const snippets: Record<string, string> = { html: htmlSnippet, wordpress: wpSnippet, webflow: webflowSnippet, webhook: webhookSnippet };
+  const tabLabels: Record<string, string> = { html: 'HTML', wordpress: 'WordPress', webflow: 'Webflow', webhook: 'Webhook' };
 
   return (
     <div>
-      <div className="flex gap-1 mb-3">
-        {(['html', 'wordpress', 'webflow'] as const).map(t => (
+      <div className="flex gap-1 mb-3 flex-wrap">
+        {allTabs.map(t => (
           <button key={t} onClick={() => setTab(t)}
             className={`px-3 py-1.5 text-xs font-semibold rounded-btn transition-all ${tab === t ? 'bg-primary text-white' : 'text-gray-500 hover:text-brand-text'}`}>
             {tabLabels[t]}
           </button>
         ))}
       </div>
-      <div className="relative bg-brand-text rounded-lg p-4 overflow-x-auto">
-        <pre className="text-xs text-green-400 whitespace-pre-wrap break-all font-mono">{snippets[tab]}</pre>
-        <div className="absolute top-2 right-2"><CopyButton text={snippets[tab]} /></div>
-      </div>
+      {tab === 'webhook' ? (
+        <div>
+          <div className="relative bg-brand-text rounded-lg p-4 overflow-x-auto">
+            <pre className="text-xs text-green-400 whitespace-pre-wrap break-all font-mono">{webhookSnippet}</pre>
+            <div className="absolute top-2 right-2"><CopyButton text={webhookSnippet} /></div>
+          </div>
+          <p className="text-xs text-gray-400 mt-2">Retourne les données JSON brutes — utile pour une intégration personnalisée ou headless.</p>
+        </div>
+      ) : (
+        <div className="relative bg-brand-text rounded-lg p-4 overflow-x-auto">
+          <pre className="text-xs text-green-400 whitespace-pre-wrap break-all font-mono">{snippets[tab]}</pre>
+          <div className="absolute top-2 right-2"><CopyButton text={snippets[tab]} /></div>
+        </div>
+      )}
     </div>
   );
 }
@@ -175,13 +190,18 @@ export default function WidgetDetail() {
   if (loading) return <div className="p-6 text-sm text-gray-400">Chargement...</div>;
   if (!widget) return null;
 
+  const isApiWidget = !!def?.apiWidget;
+  const isWebhookOnly = !!config.webhookOnly;
+  const baseUrl = import.meta.env.VITE_API_URL || window.location.origin;
+  const previewSrcdoc = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{margin:0;padding:16px;background:#F8F8F8}</style></head><body><div data-ww-id="${widget.id}"></div><script src="${baseUrl}/widget.js" async></script></body></html>`;
+
   return (
-    <div className="p-6 max-w-4xl mx-auto">
+    <div className="p-6 max-w-5xl mx-auto">
       <div className="flex items-center gap-3 mb-6">
         <Link to="/" className="text-gray-400 hover:text-primary transition-colors text-lg leading-none">←</Link>
         <div className="flex-1">
           <h1 className="text-xl font-bold text-brand-text">{def?.icon} {widget.name}</h1>
-          <p className="text-xs text-gray-400">{def?.name || widget.type}</p>
+          <p className="text-xs text-gray-400">{def?.name || widget.type}{isWebhookOnly && ' · Webhook'}</p>
         </div>
         <button onClick={() => setShowDeleteConfirm(true)} className="text-xs text-red-500 hover:text-red-700 transition-colors">
           Supprimer
@@ -198,7 +218,7 @@ export default function WidgetDetail() {
               <label className="label">Nom du widget</label>
               <input className="input" type="text" value={name} onChange={e => setName(e.target.value)} required />
             </div>
-            {def?.fields.map(field => (
+            {def?.fields.filter(f => f.key !== 'placeId' || !isApiWidget).map(field => (
               <FieldInput key={field.key} field={field} value={config[field.key]} onChange={v => updateConfig(field.key, v)} />
             ))}
             {!def && (
@@ -211,15 +231,45 @@ export default function WidgetDetail() {
           </button>
         </form>
 
-        {/* Snippet + info panel */}
+        {/* Right panel */}
         <div className="flex flex-col gap-4">
-          <div className="card">
-            <h3 className="font-semibold text-brand-text text-sm mb-3">Intégrer ce widget</h3>
-            <SnippetTabs widgetId={widget.id} />
-          </div>
+          {/* Webhook-only: prominent endpoint */}
+          {isWebhookOnly ? (
+            <div className="card">
+              <h3 className="font-semibold text-brand-text text-sm mb-1">Endpoint webhook</h3>
+              <p className="text-xs text-gray-400 mb-3">Appelez cette URL pour récupérer les données JSON brutes.</p>
+              <div className="relative bg-brand-text rounded-lg p-4">
+                <pre className="text-xs text-green-400 font-mono break-all whitespace-pre-wrap">{`GET ${baseUrl}/widget/${widget.id}/data`}</pre>
+                <div className="absolute top-2 right-2">
+                  <CopyButton text={`${baseUrl}/widget/${widget.id}/data`} />
+                </div>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="card">
+                <h3 className="font-semibold text-brand-text text-sm mb-3">Intégrer ce widget</h3>
+                <SnippetTabs widgetId={widget.id} isApiWidget={isApiWidget} />
+              </div>
+              {/* Live preview */}
+              <div className="card">
+                <h3 className="font-semibold text-brand-text text-sm mb-3">Aperçu</h3>
+                <div className="rounded-btn overflow-hidden border border-gray-100 bg-brand-subtle" style={{ minHeight: 200 }}>
+                  <iframe
+                    key={saved ? 'saved' : 'initial'}
+                    srcDoc={previewSrcdoc}
+                    className="w-full"
+                    style={{ minHeight: 200, border: 'none' }}
+                    title="Aperçu du widget"
+                  />
+                </div>
+                <p className="text-xs text-gray-400 mt-2">L'aperçu se met à jour après chaque sauvegarde.</p>
+              </div>
+            </>
+          )}
 
           <div className="card text-xs text-gray-500 flex flex-col gap-1">
-            <div className="flex justify-between"><span>ID du widget</span><code className="font-mono text-brand-text">{widget.id}</code></div>
+            <div className="flex justify-between"><span>ID</span><code className="font-mono text-brand-text">{widget.id}</code></div>
             <div className="flex justify-between"><span>Type</span><span className="font-medium text-brand-text">{def?.name || widget.type}</span></div>
             <div className="flex justify-between"><span>Créé le</span><span>{new Date(widget.createdAt).toLocaleDateString('fr-FR')}</span></div>
           </div>

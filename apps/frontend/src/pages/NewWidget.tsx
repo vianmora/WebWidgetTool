@@ -96,8 +96,10 @@ function PlaceSearch({ placeId, onSelect }: { placeId: string; onSelect: (id: st
   const [suggestions, setSuggestions] = useState<PlacePrediction[]>([]);
   const [searching, setSearching] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -109,6 +111,7 @@ function PlaceSearch({ placeId, onSelect }: { placeId: string; onSelect: (id: st
 
   function handleChange(value: string) {
     setSearch(value);
+    setActiveIndex(-1);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (value.trim().length < 2) { setSuggestions([]); setShowDropdown(false); return; }
     debounceRef.current = setTimeout(async () => {
@@ -122,10 +125,35 @@ function PlaceSearch({ placeId, onSelect }: { placeId: string; onSelect: (id: st
     }, 350);
   }
 
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (!showDropdown || suggestions.length === 0) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setActiveIndex(i => {
+        const next = Math.min(i + 1, suggestions.length - 1);
+        listRef.current?.children[next]?.scrollIntoView({ block: 'nearest' });
+        return next;
+      });
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActiveIndex(i => {
+        const next = Math.max(i - 1, 0);
+        listRef.current?.children[next]?.scrollIntoView({ block: 'nearest' });
+        return next;
+      });
+    } else if (e.key === 'Enter' && activeIndex >= 0) {
+      e.preventDefault();
+      select(suggestions[activeIndex]);
+    } else if (e.key === 'Escape') {
+      setShowDropdown(false);
+    }
+  }
+
   function select(place: PlacePrediction) {
     setSearch(place.description);
     setSuggestions([]);
     setShowDropdown(false);
+    setActiveIndex(-1);
     onSelect(place.place_id, place.main_text);
   }
 
@@ -133,15 +161,17 @@ function PlaceSearch({ placeId, onSelect }: { placeId: string; onSelect: (id: st
     <div>
       <label className="label">Rechercher votre établissement <span className="text-red-500">*</span></label>
       <div className="relative" ref={dropdownRef}>
-        <input className="input" type="text" value={search} onChange={e => handleChange(e.target.value)}
+        <input className="input" type="text" value={search}
+          onChange={e => handleChange(e.target.value)}
+          onKeyDown={handleKeyDown}
           onFocus={() => suggestions.length > 0 && setShowDropdown(true)}
           placeholder="Ex: Boulangerie Martin, Paris..." autoComplete="off" />
         {searching && <span className="absolute right-3 top-2.5 text-gray-400 text-xs">Recherche...</span>}
         {showDropdown && (
-          <ul className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
-            {suggestions.map(place => (
+          <ul ref={listRef} className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+            {suggestions.map((place, i) => (
               <li key={place.place_id} onMouseDown={() => select(place)}
-                className="px-4 py-3 cursor-pointer hover:bg-brand-subtle border-b border-gray-100 last:border-0">
+                className={`px-4 py-3 cursor-pointer border-b border-gray-100 last:border-0 ${i === activeIndex ? 'bg-brand-subtle' : 'hover:bg-brand-subtle'}`}>
                 <p className="text-sm font-medium text-brand-text">{place.main_text}</p>
                 <p className="text-xs text-gray-400">{place.secondary_text}</p>
               </li>
@@ -163,16 +193,18 @@ export default function NewWidget() {
   const [config, setConfig] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [apiMenuOpen, setApiMenuOpen] = useState<string | null>(null);
 
   const def = selectedType ? getWidgetDef(selectedType) : null;
 
-  function selectWidget(type: string) {
+  function selectWidget(type: string, extra: Record<string, any> = {}) {
     const d = getWidgetDef(type);
     if (!d || d.status === 'soon') return;
     setSelectedType(type);
-    setConfig({ ...d.defaultConfig });
+    setConfig({ ...d.defaultConfig, ...extra });
     setWidgetName('');
     setError('');
+    setApiMenuOpen(null);
   }
 
   function updateConfig(key: string, value: any) {
@@ -208,19 +240,43 @@ export default function NewWidget() {
   // ── Step 1: Catalogue ──
   if (!selectedType) {
     const widgetCard = (widget: typeof WIDGET_CATALOG[0]) => (
-      <button
-        key={widget.type}
-        onClick={() => selectWidget(widget.type)}
-        disabled={widget.status === 'soon'}
-        className={`text-left card hover:shadow-md transition-all group relative ${widget.status === 'soon' ? 'opacity-60 cursor-not-allowed' : 'hover:border-primary/40 cursor-pointer'}`}
-      >
-        {widget.status === 'soon' && (
-          <span className="absolute top-3 right-3 bg-gray-100 text-gray-500 text-xs px-2 py-0.5 rounded font-semibold">Bientôt</span>
+      <div key={widget.type} className="relative">
+        <button
+          onClick={() => widget.status !== 'soon' && !widget.apiWidget && selectWidget(widget.type)}
+          disabled={widget.status === 'soon'}
+          className={`w-full text-left card hover:shadow-md transition-all group relative ${widget.status === 'soon' ? 'opacity-60 cursor-not-allowed' : 'hover:border-primary/40 cursor-pointer'}`}
+        >
+          {widget.status === 'soon' && (
+            <span className="absolute top-3 right-3 bg-gray-100 text-gray-500 text-xs px-2 py-0.5 rounded font-semibold">Bientôt</span>
+          )}
+          {widget.apiWidget && widget.status !== 'soon' && (
+            <button
+              type="button"
+              onClick={e => { e.stopPropagation(); setApiMenuOpen(apiMenuOpen === widget.type ? null : widget.type); }}
+              className="absolute top-2 right-2 w-6 h-6 flex items-center justify-center rounded text-gray-400 hover:text-primary hover:bg-gray-100 transition-colors"
+            >
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+                <circle cx="8" cy="2.5" r="1.5"/><circle cx="8" cy="8" r="1.5"/><circle cx="8" cy="13.5" r="1.5"/>
+              </svg>
+            </button>
+          )}
+          <div className="text-2xl mb-2">{widget.icon}</div>
+          <div className="font-semibold text-sm text-brand-text mb-1 group-hover:text-primary transition-colors">{widget.name}</div>
+          <div className="text-xs text-gray-500 line-clamp-2">{widget.description}</div>
+        </button>
+        {widget.apiWidget && apiMenuOpen === widget.type && (
+          <div className="absolute right-0 top-10 z-20 w-52 bg-white rounded-lg border border-gray-200 shadow-lg py-1">
+            <button onClick={() => selectWidget(widget.type)}
+              className="w-full text-left px-4 py-2.5 text-sm text-brand-text hover:bg-brand-subtle flex items-center gap-2">
+              <span>🎨</span> Créer un widget visuel
+            </button>
+            <button onClick={() => selectWidget(widget.type, { webhookOnly: true })}
+              className="w-full text-left px-4 py-2.5 text-sm text-brand-text hover:bg-brand-subtle flex items-center gap-2">
+              <span>🔗</span> Créer un webhook
+            </button>
+          </div>
         )}
-        <div className="text-2xl mb-2">{widget.icon}</div>
-        <div className="font-semibold text-sm text-brand-text mb-1 group-hover:text-primary transition-colors">{widget.name}</div>
-        <div className="text-xs text-gray-500 line-clamp-2">{widget.description}</div>
-      </button>
+      </div>
     );
 
     return (
