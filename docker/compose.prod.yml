@@ -36,8 +36,10 @@ services:
       ADMIN_EMAIL:                ${ADMIN_EMAIL:?ADMIN_EMAIL is required}
       ADMIN_PASSWORD:             ${ADMIN_PASSWORD:?ADMIN_PASSWORD is required}
       JWT_SECRET:                 ${JWT_SECRET:?JWT_SECRET is required}
+      APP_MODE:                   ${APP_MODE:-selfhosted}
       GOOGLE_MAPS_API_KEY:        ${GOOGLE_MAPS_API_KEY}
       GOOGLE_REVIEWS_CACHE_TTL:   ${GOOGLE_REVIEWS_CACHE_TTL:-604800}
+      APIFY_TOKEN:                ${APIFY_TOKEN}
       # FRONTEND_URL must match the public URL of the app (for CORS on embedded widgets)
       FRONTEND_URL:               ${APP_URL:-http://localhost:3000}
     depends_on:
