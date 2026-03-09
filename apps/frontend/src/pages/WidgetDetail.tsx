@@ -164,6 +164,10 @@ export default function WidgetDetail() {
   const [mode, setMode] = useState<Mode>('view');
   const [stats, setStats] = useState<Stats | null>(null);
   const [previewKey, setPreviewKey] = useState(0);
+  // 'live' = WidgetLivePreview (Places API, rapide), 'iframe' = widget réel (cache Apify chaud)
+  const [previewMode, setPreviewMode] = useState<'live' | 'iframe'>('live');
+  const [previewSyncing, setPreviewSyncing] = useState(false);
+  const [prefetchTrigger, setPrefetchTrigger] = useState(0);
 
   useEffect(() => {
     Promise.all([
@@ -177,6 +181,28 @@ export default function WidgetDetail() {
       setLoading(false);
     }).catch(() => navigate('/'));
   }, [id]);
+
+  // Prefetch /widget/:id/data to warm the Apify cache.
+  // While waiting: show WidgetLivePreview (Places API, 5 avis, rapide).
+  // Once done: swap vers l'iframe réelle qui charge instantanément depuis le cache.
+  useEffect(() => {
+    if (!widget) return;
+    if (widget.type !== 'google_reviews') { setPreviewMode('iframe'); return; }
+
+    setPreviewMode('live');
+    const publicBase = import.meta.env.VITE_API_URL || window.location.origin;
+    const slowTimer = setTimeout(() => setPreviewSyncing(true), 2000);
+
+    fetch(`${publicBase}/widget/${widget.id}/data`)
+      .finally(() => {
+        clearTimeout(slowTimer);
+        setPreviewSyncing(false);
+        setPreviewMode('iframe');
+        setPreviewKey(k => k + 1);
+      });
+
+    return () => clearTimeout(slowTimer);
+  }, [widget?.id, prefetchTrigger]);
 
   const def = widget ? getWidgetDef(widget.type) : null;
   const isApiWidget = !!def?.apiWidget;
@@ -195,8 +221,13 @@ export default function WidgetDetail() {
     try {
       await api.patch(`/api/widgets/${id}`, { name, config });
       setSaved(true);
-      setPreviewKey(k => k + 1);
       setWidget(prev => prev ? { ...prev, name, config } : prev);
+      if (widget?.type === 'google_reviews') {
+        setPreviewMode('live');
+        setPrefetchTrigger(t => t + 1);
+      } else {
+        setPreviewKey(k => k + 1);
+      }
       setTimeout(() => {
         setSaved(false);
         setMode('view');
@@ -316,14 +347,28 @@ export default function WidgetDetail() {
           {/* Live preview */}
           <div className="card mb-4">
             <h3 className="font-semibold text-brand-text text-sm mb-3">Aperçu</h3>
-            <div className="rounded-btn overflow-hidden border border-gray-100 bg-brand-subtle">
-              <iframe
-                key={previewKey}
-                srcDoc={previewSrcdoc}
-                className="w-full"
-                style={{ minHeight: 408, border: 'none' }}
-                title="Aperçu du widget"
-              />
+            <div className="rounded-btn overflow-hidden border border-gray-100 bg-brand-subtle relative">
+              {previewMode === 'live' ? (
+                <div className="relative">
+                  <div className="p-3">
+                    <WidgetLivePreview type={widget.type} config={config} />
+                  </div>
+                  {previewSyncing && (
+                    <div className="absolute bottom-0 left-0 right-0 bg-white/95 border-t border-gray-100 px-4 py-2.5 flex items-center gap-2.5">
+                      <div className="w-3.5 h-3.5 rounded-full border-2 border-primary border-t-transparent animate-spin flex-shrink-0" />
+                      <p className="text-xs text-gray-500">Récupération des photos via Apify en cours — l'aperçu final se chargera automatiquement.</p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <iframe
+                  key={previewKey}
+                  srcDoc={previewSrcdoc}
+                  className="w-full"
+                  style={{ minHeight: 408, border: 'none' }}
+                  title="Aperçu du widget"
+                />
+              )}
             </div>
           </div>
 

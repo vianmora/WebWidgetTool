@@ -98,13 +98,14 @@ router.get('/:id/stats', async (req: AuthRequest, res) => {
 
 router.patch('/:id', async (req: AuthRequest, res) => {
   try {
-    // Ownership check in SaaS mode
-    if (isSaaS()) {
-      const existing = await prisma.widget.findUnique({ where: { id: req.params.id } });
-      if (!existing || existing.userId !== req.user!.id) {
-        res.status(403).json({ error: 'Forbidden' });
-        return;
-      }
+    const existing = await prisma.widget.findUnique({ where: { id: req.params.id } });
+    if (!existing) {
+      res.status(404).json({ error: 'Widget introuvable.' });
+      return;
+    }
+    if (isSaaS() && existing.userId !== req.user!.id) {
+      res.status(403).json({ error: 'Forbidden' });
+      return;
     }
 
     const { name, config } = req.body;
@@ -115,7 +116,23 @@ router.patch('/:id', async (req: AuthRequest, res) => {
         ...(config !== undefined && { config }),
       },
     });
-    cache.del(req.params.id);
+
+    // Always invalidate the final response cache (config may have changed)
+    cache.del(`data:${req.params.id}`);
+
+    // For google_reviews: only invalidate the raw reviews cache if Apify-relevant fields changed
+    if (existing.type === 'google_reviews' && config !== undefined) {
+      const oldCfg = existing.config as any;
+      const newCfg = config as any;
+      const apifyFieldChanged =
+        oldCfg.placeId !== newCfg.placeId ||
+        String(oldCfg.maxReviews ?? 5) !== String(newCfg.maxReviews ?? 5) ||
+        (oldCfg.language || 'fr') !== (newCfg.language || 'fr');
+      if (apifyFieldChanged) {
+        cache.del(`apify:${oldCfg.placeId}:${Number(oldCfg.maxReviews ?? 5)}:${oldCfg.language || 'fr'}`);
+      }
+    }
+
     res.json(widget);
   } catch (err: any) {
     res.status(500).json({ error: err.message });

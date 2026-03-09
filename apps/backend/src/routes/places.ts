@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth';
 import { searchPlaces, fetchGoogleReviewsWithPhotos } from '../lib/google';
+import cache from '../lib/cache';
 
 const router = Router();
 
@@ -35,8 +36,14 @@ router.get('/reviews', async (req, res) => {
     res.status(500).json({ error: 'GOOGLE_MAPS_API_KEY non configurée.' });
     return;
   }
+
+  const cacheKey = `places:${placeId}`;
+  const cached = cache.get(cacheKey);
+  if (cached) { res.json(cached); return; }
+
   try {
     const reviews = await fetchGoogleReviewsWithPhotos(placeId, apiKey, 'fr');
+    cache.set(cacheKey, reviews);
     res.json(reviews);
   } catch (err: any) {
     res.status(500).json({ error: err.message });

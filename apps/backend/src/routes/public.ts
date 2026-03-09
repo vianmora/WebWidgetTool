@@ -3,15 +3,13 @@ import axios from 'axios';
 import prisma from '../lib/prisma';
 import cache from '../lib/cache';
 import { fetchGoogleReviewsWithPhotos } from '../lib/google';
-import { scrapeGoogleReviews } from '../lib/scraper';
+import { fetchReviewsViaApify } from '../lib/apify';
 import { isSaaS } from '../lib/mode';
 import { hasReachedViewLimit } from '../lib/planLimits';
 
 const router = Router();
 
-const USE_SCRAPER = process.env.PLAYWRIGHT_SCRAPER === 'true';
-
-// Accepts any Google CDN host (profile photos + scraped review photos)
+// Accepts any Google CDN host (profile photos + review photos)
 function isAllowedImageHost(hostname: string): boolean {
   return (
     hostname.endsWith('.googleusercontent.com') ||
@@ -51,7 +49,8 @@ router.get('/image', async (req, res) => {
     res.setHeader('Content-Type', contentType);
     res.setHeader('Cache-Control', 'public, max-age=86400');
     res.send(data);
-  } catch {
+  } catch (err: any) {
+    console.error('[image-proxy] fetch failed:', url.slice(0, 80), '—', err?.response?.status ?? err?.message);
     res.status(502).end();
   }
 });
@@ -72,19 +71,27 @@ async function getWidgetData(widgetId: string, req: any) {
 
       let rawReviews: Awaited<ReturnType<typeof fetchGoogleReviewsWithPhotos>>;
 
-      if (USE_SCRAPER) {
+      // Cache the raw reviews independently of the widget config (theme, layout, etc.)
+      const rawCacheKey = `apify:${config.placeId}:${maxReviews}:${language}`;
+      const cachedRaw = cache.get<typeof rawReviews>(rawCacheKey);
+
+      if (cachedRaw) {
+        rawReviews = cachedRaw;
+      } else if (process.env.APIFY_TOKEN) {
         try {
-          rawReviews = await scrapeGoogleReviews(config.placeId, maxReviews, language);
-        } catch (scraperErr) {
-          console.error('[scraper] Playwright failed, falling back to Places API:', scraperErr);
+          rawReviews = await fetchReviewsViaApify(config.placeId, maxReviews, language);
+        } catch (apifyErr) {
+          console.error('[apify] failed, falling back to Places API:', apifyErr);
           const apiKey = process.env.GOOGLE_MAPS_API_KEY || config.apiKey;
           rawReviews = apiKey
             ? await fetchGoogleReviewsWithPhotos(config.placeId, apiKey, language)
             : [];
         }
+        cache.set(rawCacheKey, rawReviews);
       } else {
         const apiKey = process.env.GOOGLE_MAPS_API_KEY || config.apiKey;
         rawReviews = await fetchGoogleReviewsWithPhotos(config.placeId, apiKey, language);
+        cache.set(rawCacheKey, rawReviews);
       }
 
       const filtered = rawReviews
@@ -99,6 +106,13 @@ async function getWidgetData(widgetId: string, req: any) {
             (url) => `${baseUrl}/widget/image?url=${encodeURIComponent(url)}`,
           ),
         }));
+
+      if (filtered.length > 0) {
+        const r0 = filtered[0] as any;
+        console.log('[reviews] first review — profile_photo_url:', r0.profile_photo_url?.slice(0, 80));
+        console.log('[reviews] first review — review_photos count:', (r0.review_photos || []).length);
+        console.log('[reviews] total after filter:', filtered.length, '/ raw:', rawReviews.length);
+      }
 
       return { reviews: filtered };
     }

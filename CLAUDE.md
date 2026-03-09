@@ -81,6 +81,7 @@ Copy `.env.example` to `.env`. Key variables:
 | `FRONTEND_URL` | yes | used for CORS on `/api/*` routes |
 | `APP_URL` | prod only | public URL, used in embed snippets |
 | `GOOGLE_REVIEWS_CACHE_TTL` | no | seconds, default 604800 (7 days) |
+| `APIFY_TOKEN` | no | si renseigné, utilise Apify (`compass/google-maps-reviews-scraper`) pour récupérer les avis sans limite des 5 et avec photos. Sinon fallback Google Places API. Token sur console.apify.com |
 
 ## Database
 
@@ -118,6 +119,7 @@ Migrations live in `apps/backend/prisma/migrations/`. Run `prisma migrate deploy
    - De mettre à jour la doc si besoin (doc de self host ou doc d'utilisation générale selon le cas)
    - De mettre à jour ce fichier CLAUDE.md si tu trouves quelque chose d'utile à retenir pour la prochaine session
    - D'ajouter une entrée dans `CLAUDE_HISTORIQUE.md` (format : `| date | demande résumée | action effectuée |`)
+9. Si tu veux que je relance quelque chose, donne moi la commande explicite à chaque fois
 
 ## Versioning
 

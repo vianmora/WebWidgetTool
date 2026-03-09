@@ -42,7 +42,7 @@ export interface GoogleReview {
   time: number;
   profile_photo_url: string;
   relative_time_description: string;
-  review_photos?: string[]; // populated by Playwright scraper, empty with Places API
+  review_photos?: string[]; // populated by Apify scraper, empty with Places API
 }
 
 // Legacy Places API — no review photos

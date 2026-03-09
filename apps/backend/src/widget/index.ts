@@ -19,8 +19,20 @@ import { render as renderPdfViewer } from './renderers/pdf_viewer';
 import { render as renderTestimonials } from './renderers/testimonials';
 import { render as renderRatingBadge } from './renderers/rating_badge';
 
-// Determine API base URL: same origin (prod) or explicit VITE_API_URL (dev)
-const API_BASE = (window as any).__WW_API_BASE__ || '';
+// Determine API base URL.
+// Priority: explicit window.__WW_API_BASE__ → auto-detect from this script's src → relative (same origin)
+function resolveApiBase(): string {
+  if ((window as any).__WW_API_BASE__) return (window as any).__WW_API_BASE__;
+  // Find the widget.js script tag and extract its origin
+  const scripts = document.querySelectorAll<HTMLScriptElement>('script[src]');
+  for (let i = scripts.length - 1; i >= 0; i--) {
+    if (scripts[i].src.includes('/widget.js')) {
+      try { return new URL(scripts[i].src).origin; } catch { break; }
+    }
+  }
+  return '';
+}
+const API_BASE = resolveApiBase();
 
 type RendererFn = (container: HTMLElement, config: any, data: any) => void;
 
