@@ -14,6 +14,10 @@ import adminRouter from './routes/admin';
 const app = express();
 const PORT = process.env.PORT || 4000;
 
+// Trust the first reverse proxy (Traefik, Nginx, Coolify…) so that
+// express-rate-limit can read X-Forwarded-For correctly.
+app.set('trust proxy', 1);
+
 const dashboardCors = cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:3000',
   credentials: true,
