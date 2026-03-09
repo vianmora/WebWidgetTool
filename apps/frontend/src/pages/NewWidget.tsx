@@ -407,6 +407,7 @@ function PlaceSearch({ placeId, onSelect }: { placeId: string; onSelect: (id: st
   const [searching, setSearching] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
+  const [searchError, setSearchError] = useState<'api_key_missing' | 'api_error' | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
@@ -422,6 +423,7 @@ function PlaceSearch({ placeId, onSelect }: { placeId: string; onSelect: (id: st
   function handleChange(value: string) {
     setSearch(value);
     setActiveIndex(-1);
+    setSearchError(null);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (value.trim().length < 2) { setSuggestions([]); setShowDropdown(false); return; }
     debounceRef.current = setTimeout(async () => {
@@ -430,7 +432,15 @@ function PlaceSearch({ placeId, onSelect }: { placeId: string; onSelect: (id: st
         const { data } = await api.get('/api/places/search', { params: { q: value } });
         setSuggestions(data);
         setShowDropdown(data.length > 0);
-      } catch { setSuggestions([]); }
+      } catch (err: any) {
+        setSuggestions([]);
+        const msg: string = err?.response?.data?.error || '';
+        if (msg.includes('API_KEY_MISSING') || msg.toLowerCase().includes('api key') || msg.includes('GOOGLE_MAPS_API_KEY')) {
+          setSearchError('api_key_missing');
+        } else {
+          setSearchError('api_error');
+        }
+      }
       finally { setSearching(false); }
     }, 350);
   }
@@ -477,6 +487,16 @@ function PlaceSearch({ placeId, onSelect }: { placeId: string; onSelect: (id: st
           onFocus={() => suggestions.length > 0 && setShowDropdown(true)}
           placeholder="Ex: Boulangerie Martin, Paris..." autoComplete="off" />
         {searching && <span className="absolute right-3 top-2.5 text-gray-400 text-xs">Recherche...</span>}
+        {searchError === 'api_key_missing' && (
+          <p className="mt-1.5 text-xs bg-red-50 border border-red-200 text-red-700 rounded-btn px-3 py-2">
+            ⚠️ Clé API Google Maps non configurée sur le serveur. Contactez l'administrateur.
+          </p>
+        )}
+        {searchError === 'api_error' && (
+          <p className="mt-1.5 text-xs bg-red-50 border border-red-200 text-red-700 rounded-btn px-3 py-2">
+            ⚠️ Erreur lors de la recherche. Vérifiez que la clé API Google Maps est valide.
+          </p>
+        )}
         {showDropdown && (
           <ul ref={listRef} className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
             {suggestions.map((place, i) => (
@@ -560,7 +580,11 @@ export default function NewWidget() {
     if (!def) return;
     for (const field of def.fields) {
       if (field.required && !config[field.key]) {
-        setError(`Le champ "${field.label}" est requis.`);
+        if (field.key === 'placeId') {
+          setError('Veuillez sélectionner un établissement via la recherche.');
+        } else {
+          setError(`Le champ "${field.label}" est requis.`);
+        }
         return;
       }
     }
@@ -602,7 +626,9 @@ export default function NewWidget() {
               </svg>
             </button>
           )}
-          <div className="text-2xl mb-2">{widget.icon}</div>
+          {widget.image
+            ? <img src={widget.image} alt={widget.name} className="h-8 w-auto object-contain mb-2" />
+            : <div className="text-2xl mb-2">{widget.icon}</div>}
           <div className="font-semibold text-sm text-brand-text mb-1 group-hover:text-primary transition-colors">{widget.name}</div>
           <div className="text-xs text-gray-500 line-clamp-2">{widget.description}</div>
         </button>
@@ -673,91 +699,137 @@ export default function NewWidget() {
     );
   }
 
+  // ── Shared page shell (steps template + config) ───────────────────────────
+  const totalSteps = templates.length >= 2 && !pendingExtra.webhookOnly ? 2 : 1;
+  const currentStep = step === 'template' ? 1 : totalSteps;
+  const stepLabel = step === 'template' ? 'Template' : 'Paramètres';
+
+  const PageShell = ({ children }: { children: React.ReactNode }) => (
+    <div className="py-8 px-4">
+      {/* Breadcrumb + step indicator */}
+      <div className="max-w-4xl mx-auto mb-5 flex items-center justify-between">
+        <nav className="flex items-center gap-1.5 text-sm">
+          <button
+            onClick={() => { setStep('catalog'); setSelectedType(null); }}
+            className="text-gray-400 hover:text-primary transition-colors"
+          >
+            ← Tous les widgets
+          </button>
+          <span className="text-gray-300">/</span>
+          <span className="text-gray-500 font-medium">{def?.name}</span>
+          <span className="text-gray-300">/</span>
+          <span className="text-brand-text font-semibold">{stepLabel}</span>
+        </nav>
+        {totalSteps > 1 && (
+          <span className="text-xs text-gray-400 font-medium">Étape {currentStep}/{totalSteps}</span>
+        )}
+      </div>
+
+      {/* Main frame */}
+      <div className="max-w-4xl mx-auto bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+        {/* Widget identity strip */}
+        <div className="px-6 pt-5 pb-4 border-b border-gray-100 flex items-center gap-3">
+          {def?.image
+            ? <img src={def.image} alt={def?.name} className="h-7 w-auto object-contain" />
+            : <span className="text-xl">{def?.icon}</span>}
+          <div className="flex-1 min-w-0">
+            <h1 className="text-base font-bold text-brand-text leading-tight">{def?.name}</h1>
+            <p className="text-xs text-gray-400 truncate">{def?.description}</p>
+          </div>
+          {step === 'config' && templates[selectedTemplateIdx] && !pendingExtra.webhookOnly && (
+            <span className="text-xs bg-gray-100 text-gray-500 px-2.5 py-1 rounded-btn font-medium whitespace-nowrap">
+              {templates[selectedTemplateIdx].label}
+            </span>
+          )}
+        </div>
+
+        {children}
+      </div>
+    </div>
+  );
+
   // ── Step 2: Template picker ────────────────────────────────────────────────
   if (step === 'template') {
     return (
-      <div className="flex" style={{ minHeight: 'calc(100vh - 64px)' }}>
-        {/* Left panel — dark sidebar */}
-        <div className="w-72 bg-gray-900 flex flex-col flex-shrink-0">
-          <div className="p-4 border-b border-gray-800">
+      <PageShell>
+        <div className="p-6">
+          <h2 className="text-sm font-semibold text-brand-text mb-1">Choisissez un template</h2>
+          <p className="text-xs text-gray-400 mb-6">Sélectionnez le style qui correspond le mieux à votre site</p>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Template grid */}
+            <div className="grid grid-cols-2 gap-3">
+              {templates.map((template, idx) => (
+                <button
+                  key={template.id}
+                  onClick={() => setSelectedTemplateIdx(idx)}
+                  className={`p-2 rounded-xl border-2 transition-all text-left ${
+                    selectedTemplateIdx === idx
+                      ? 'border-primary bg-primary/5 shadow-sm'
+                      : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  <TemplateThumbnail type={selectedType!} templateId={template.id} className="w-full h-auto rounded-lg" />
+                  <p className={`text-xs mt-2 text-center leading-tight font-medium ${selectedTemplateIdx === idx ? 'text-primary' : 'text-gray-500'}`}>
+                    {template.label}
+                  </p>
+                </button>
+              ))}
+            </div>
+
+            {/* Large preview */}
+            <div className="flex flex-col items-center justify-center bg-gray-50 rounded-xl p-6 border border-gray-100">
+              <p className="text-xs text-gray-400 uppercase tracking-widest mb-4 font-semibold">Aperçu</p>
+              <TemplateThumbnail
+                type={selectedType!}
+                templateId={templates[selectedTemplateIdx]?.id ?? 'default'}
+                className="w-full h-auto rounded-xl shadow-md border border-gray-200"
+              />
+              <p className="text-sm font-semibold text-brand-text mt-3">
+                {templates[selectedTemplateIdx]?.label}
+              </p>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="flex justify-between items-center mt-6 pt-5 border-t border-gray-100">
             <button
+              type="button"
               onClick={() => { setStep('catalog'); setSelectedType(null); }}
-              className="text-gray-400 hover:text-white text-sm flex items-center gap-1.5 mb-3 transition-colors"
+              className="btn-secondary"
             >
               ← Retour
             </button>
-            <div className="text-white font-semibold text-sm">{def?.icon} {def?.name}</div>
-            <div className="text-gray-400 text-xs mt-1">Choisir un template</div>
-          </div>
-
-          <div className="flex-1 overflow-y-auto p-3 grid grid-cols-2 gap-3 content-start">
-            {templates.map((template, idx) => (
-              <button
-                key={template.id}
-                onClick={() => setSelectedTemplateIdx(idx)}
-                className={`p-1.5 rounded-lg border-2 transition-all text-left ${selectedTemplateIdx === idx ? 'border-green-400 bg-gray-800' : 'border-gray-700 hover:border-gray-500 hover:bg-gray-800'}`}
-              >
-                <TemplateThumbnail type={selectedType!} templateId={template.id} className="w-full h-auto rounded-md" />
-                <p className="text-xs text-gray-300 mt-1.5 text-center leading-tight">{template.label}</p>
-              </button>
-            ))}
-          </div>
-
-          <div className="p-4 border-t border-gray-800">
-            <button
-              onClick={continueToConfig}
-              className="w-full bg-green-500 hover:bg-green-400 text-white font-semibold py-3 rounded-lg text-sm transition-colors"
-            >
-              Continuer avec ce template
+            <button onClick={continueToConfig} className="btn-primary">
+              Continuer →
             </button>
           </div>
         </div>
-
-        {/* Right panel — large preview */}
-        <div className="flex-1 bg-white flex flex-col items-center justify-center p-10">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-6">
-            {templates[selectedTemplateIdx]?.label}
-          </p>
-          <div className="w-full max-w-xl">
-            <TemplateThumbnail
-              type={selectedType!}
-              templateId={templates[selectedTemplateIdx]?.id ?? 'default'}
-              className="w-full h-auto rounded-2xl shadow-xl border border-gray-100"
-            />
-          </div>
-        </div>
-      </div>
+      </PageShell>
     );
   }
 
   // ── Step 3: Config form ────────────────────────────────────────────────────
-  const activeTemplateId = templates[selectedTemplateIdx]?.id ?? 'default';
-
   return (
-    <div className="p-6 max-w-5xl mx-auto">
-      <div className="flex items-center gap-3 mb-6">
-        <button onClick={goBackFromConfig} className="text-gray-400 hover:text-primary transition-colors text-lg leading-none">←</button>
-        <div className="flex-1">
-          <h1 className="text-xl font-bold text-brand-text">{def?.icon} {def?.name}</h1>
-          <p className="text-xs text-gray-400">{def?.description}</p>
-        </div>
-        {templates[selectedTemplateIdx] && (
-          <span className="text-xs text-gray-400 bg-gray-100 px-2.5 py-1 rounded-btn font-medium">
-            {templates[selectedTemplateIdx].label}
-          </span>
-        )}
-      </div>
+    <PageShell>
+      <div className="p-6">
+        <h2 className="text-sm font-semibold text-brand-text mb-1">Configurez votre widget</h2>
+        <p className="text-xs text-gray-400 mb-6">Personnalisez l'apparence et le comportement de votre widget</p>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-        {/* Left: form */}
-        <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-          {error && <p className="text-red-600 text-sm bg-red-50 rounded-btn px-3 py-2">{error}</p>}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+          {/* Left: form */}
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            {error && <p className="text-red-600 text-sm bg-red-50 rounded-btn px-3 py-2">{error}</p>}
 
-          <div className="card flex flex-col gap-4">
             <div>
               <label className="label">Nom du widget</label>
-              <input className="input" type="text" value={widgetName} onChange={e => setWidgetName(e.target.value)}
-                placeholder={`Ex: ${def?.name} — Mon site`} />
+              <input
+                className="input"
+                type="text"
+                value={widgetName}
+                onChange={e => setWidgetName(e.target.value)}
+                placeholder={`Ex: ${def?.name} — Mon site`}
+              />
             </div>
 
             {selectedType === 'google_reviews' && (
@@ -778,26 +850,24 @@ export default function NewWidget() {
                 onChange={v => updateConfig(field.key, v)}
               />
             ))}
-          </div>
 
-          <div className="flex justify-end gap-3">
-            <button type="button" onClick={goBackFromConfig} className="btn-secondary">Annuler</button>
-            <button type="submit" disabled={loading} className="btn-primary">
-              {loading ? 'Création...' : 'Créer le widget'}
-            </button>
-          </div>
-        </form>
+            <div className="flex justify-between items-center pt-4 border-t border-gray-100 mt-2">
+              <button type="button" onClick={goBackFromConfig} className="btn-secondary">← Retour</button>
+              <button type="submit" disabled={loading} className="btn-primary">
+                {loading ? 'Création...' : 'Créer le widget →'}
+              </button>
+            </div>
+          </form>
 
-        {/* Right: live preview */}
-        <div className="hidden lg:block sticky top-6">
-          <div className="card p-3 overflow-hidden">
-            <WidgetLivePreview type={selectedType!} config={config} />
+          {/* Right: live preview */}
+          <div className="hidden lg:block sticky top-6">
+            <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 overflow-hidden">
+              <p className="text-xs text-gray-400 uppercase tracking-widest mb-3 font-semibold text-center">Aperçu en direct</p>
+              <WidgetLivePreview type={selectedType!} config={config} />
+            </div>
           </div>
-          {templates[selectedTemplateIdx] && (
-            <p className="text-xs text-gray-400 mt-2 text-center">{templates[selectedTemplateIdx].label}</p>
-          )}
         </div>
       </div>
-    </div>
+    </PageShell>
   );
 }

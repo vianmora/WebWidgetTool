@@ -104,3 +104,23 @@ Migrations live in `apps/backend/prisma/migrations/`. Run `prisma migrate deploy
 ## CI
 
 `.github/workflows/docker-publish.yml` — pushes a multi-arch (`linux/amd64,linux/arm64`) image to Docker Hub on every push to `main`, but skips the push if the existing `latest` tag was pushed less than 24 hours ago. Manual `workflow_dispatch` bypasses this check. Requires `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` secrets.
+
+## Comment travailler ensemble
+
+1. Notre discussion est en français, le code est en anglais
+2. Les modifications de fix se font dans la branche `developp`
+3. Les ajouts de feature se font dans une branche dédiée ; je te dirai au début de créer une branche pour une feature spécifique
+4. Quand je te dis de commit, tu commits dans `developp` si c'est un fix, dans la branche de feature si on travaille sur une feature
+5. Quand je te dis de merge la branche de feature : merge dans `developp`, puis `developp` dans `main`, puis incrémenter le tag **mineur** (`Majeur.mineur+1.0`)
+6. Quand je te dis de merge la branche `developp` : merge dans `main`, puis incrémenter uniquement le tag **fix** (`Majeur.mineur.fix+1`)
+7. Je te le dirai si on incrémente un jour la version majeure
+8. Quand tu as fini une instruction, tu dois t'assurer :
+   - De mettre à jour la doc si besoin (doc de self host ou doc d'utilisation générale selon le cas)
+   - De mettre à jour ce fichier CLAUDE.md si tu trouves quelque chose d'utile à retenir pour la prochaine session
+   - D'ajouter une entrée dans `CLAUDE_HISTORIQUE.md` (format : `| date | demande résumée | action effectuée |`)
+
+## Versioning
+
+- Version actuelle : **v0.2.15**
+- Format : `vMajeur.mineur.fix`
+- Tags git sur `main` uniquement (ex: `git tag v0.2.16 && git push origin v0.2.16`)
