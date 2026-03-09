@@ -32,7 +32,8 @@ app.use(express.json());
 // Rate limiting on auth routes
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: process.env.NODE_ENV === 'production' ? 10 : 100,
+  max: 30,
+  skipFailedRequests: true, // 5xx errors don't consume quota (avoids exhaustion from server errors)
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Trop de tentatives. Réessayez dans 15 minutes.' },
