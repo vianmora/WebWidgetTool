@@ -10,6 +10,7 @@ export interface WidgetDefinition {
   description: string;
   category: string;
   icon: string;
+  image?: string;
   status: 'available' | 'soon';
   defaultConfig: Record<string, any>;
   fields: FieldDefinition[];
@@ -37,6 +38,7 @@ export const WIDGET_CATALOG: WidgetDefinition[] = [
     description: 'Affichez vos avis Google directement sur votre site.',
     category: 'Avis & Témoignages',
     icon: '⭐',
+    image: '/google-reviews-banner.png',
     status: 'available',
     apiWidget: true,
     defaultConfig: { placeId: '', maxReviews: 5, minRating: 4, theme: 'light', accentColor: '#621B7A', layout: 'list', language: 'fr' },
@@ -47,7 +49,7 @@ export const WIDGET_CATALOG: WidgetDefinition[] = [
       { id: 'grid-dark', label: 'Grille sombre', config: { layout: 'grid', theme: 'dark' } },
     ],
     fields: [
-      { key: 'placeId', label: 'Google Place ID', type: 'text', placeholder: 'ChIJ...', required: true, help: 'Trouvez votre Place ID sur Google Maps Platform' },
+      { key: 'placeId', label: 'Établissement Google', type: 'text', placeholder: 'ChIJ...', required: true, help: 'Recherchez votre établissement par nom ci-dessus' },
       { key: 'maxReviews', label: 'Nombre d\'avis max', type: 'number', min: 1, max: 20 },
       { key: 'minRating', label: 'Note minimale', type: 'select', options: [1,2,3,4,5].map(n => ({ value: String(n), label: `${n} étoile${n>1?'s':''} et +` })) },
       { key: 'layout', label: 'Disposition', type: 'select', options: [{ value: 'list', label: 'Liste' }, { value: 'grid', label: 'Grille' }] },

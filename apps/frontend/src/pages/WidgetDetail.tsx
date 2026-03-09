@@ -92,7 +92,7 @@ function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
   return (
     <button onClick={() => { navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
-      className="btn-secondary text-xs px-3 py-1.5">
+      className="inline-flex items-center justify-center gap-1 px-3 py-1.5 text-xs font-semibold text-white bg-transparent border border-white rounded-btn transition-all hover:bg-white hover:text-brand-text">
       {copied ? '✓ Copié' : 'Copier'}
     </button>
   );
@@ -288,13 +288,13 @@ export default function WidgetDetail() {
         <div className="flex items-end gap-8">
           <div>
             <p className="text-3xl font-bold text-brand-text tabular-nums">
-              {stats ? stats.viewsThisMonth.toLocaleString('fr-FR') : '—'}
+              {(stats?.viewsThisMonth ?? 0).toLocaleString('fr-FR')}
             </p>
             <p className="text-xs text-gray-400 mt-1">Appels ce mois-ci</p>
           </div>
           <div>
             <p className="text-xl font-semibold text-gray-500 tabular-nums">
-              {stats ? stats.viewsTotal.toLocaleString('fr-FR') : '—'}
+              {(stats?.viewsTotal ?? 0).toLocaleString('fr-FR')}
             </p>
             <p className="text-xs text-gray-400 mt-1">Total</p>
           </div>

@@ -2,21 +2,30 @@ import { Router } from 'express';
 import axios from 'axios';
 import prisma from '../lib/prisma';
 import cache from '../lib/cache';
-import { fetchGoogleReviews } from '../lib/google';
+import { fetchGoogleReviewsWithPhotos } from '../lib/google';
+import { scrapeGoogleReviews } from '../lib/scraper';
 import { isSaaS } from '../lib/mode';
 import { hasReachedViewLimit } from '../lib/planLimits';
 
 const router = Router();
 
-const ALLOWED_IMAGE_HOSTS = [
-  'lh3.googleusercontent.com',
-  'lh4.googleusercontent.com',
-  'lh5.googleusercontent.com',
-  'lh6.googleusercontent.com',
-];
+const USE_SCRAPER = process.env.PLAYWRIGHT_SCRAPER === 'true';
+
+// Accepts any Google CDN host (profile photos + scraped review photos)
+function isAllowedImageHost(hostname: string): boolean {
+  return (
+    hostname.endsWith('.googleusercontent.com') ||
+    hostname.endsWith('.googleapis.com') ||
+    hostname === 'lh3.googleusercontent.com' ||
+    hostname === 'lh4.googleusercontent.com' ||
+    hostname === 'lh5.googleusercontent.com' ||
+    hostname === 'lh6.googleusercontent.com'
+  );
+}
+
 const imageCache = new Map<string, { data: Buffer; contentType: string }>();
 
-// ─── Image proxy (Google profile photos) ──────────────────────────────────────
+// ─── Image proxy (Google photos: profile + review) ────────────────────────────
 router.get('/image', async (req, res) => {
   const url = req.query.url as string;
   if (!url) { res.status(400).end(); return; }
@@ -24,7 +33,7 @@ router.get('/image', async (req, res) => {
   let parsed: URL;
   try { parsed = new URL(url); } catch { res.status(400).end(); return; }
 
-  if (!ALLOWED_IMAGE_HOSTS.includes(parsed.hostname)) { res.status(403).end(); return; }
+  if (!isAllowedImageHost(parsed.hostname)) { res.status(403).end(); return; }
 
   if (imageCache.has(url)) {
     const { data, contentType } = imageCache.get(url)!;
@@ -56,15 +65,29 @@ async function getWidgetData(widgetId: string, req: any) {
 
   switch (widget.type) {
     case 'google_reviews': {
-      const apiKey = process.env.GOOGLE_MAPS_API_KEY || config.apiKey;
       const language: string = config.language || 'fr';
-      const reviews = await fetchGoogleReviews(config.placeId, apiKey, language);
-
-      const minRating: number = config.minRating ?? 1;
-      const maxReviews: number = config.maxReviews ?? 5;
+      const minRating: number = Number(config.minRating ?? 1);
+      const maxReviews: number = Number(config.maxReviews ?? 5);
       const baseUrl = `${req.protocol}://${req.get('host')}`;
 
-      const filtered = reviews
+      let rawReviews: Awaited<ReturnType<typeof fetchGoogleReviewsWithPhotos>>;
+
+      if (USE_SCRAPER) {
+        try {
+          rawReviews = await scrapeGoogleReviews(config.placeId, maxReviews, language);
+        } catch (scraperErr) {
+          console.error('[scraper] Playwright failed, falling back to Places API:', scraperErr);
+          const apiKey = process.env.GOOGLE_MAPS_API_KEY || config.apiKey;
+          rawReviews = apiKey
+            ? await fetchGoogleReviewsWithPhotos(config.placeId, apiKey, language)
+            : [];
+        }
+      } else {
+        const apiKey = process.env.GOOGLE_MAPS_API_KEY || config.apiKey;
+        rawReviews = await fetchGoogleReviewsWithPhotos(config.placeId, apiKey, language);
+      }
+
+      const filtered = rawReviews
         .filter((r) => r.rating >= minRating)
         .slice(0, maxReviews)
         .map((r) => ({
@@ -72,6 +95,9 @@ async function getWidgetData(widgetId: string, req: any) {
           profile_photo_url: r.profile_photo_url
             ? `${baseUrl}/widget/image?url=${encodeURIComponent(r.profile_photo_url)}`
             : r.profile_photo_url,
+          review_photos: (r.review_photos || []).map(
+            (url) => `${baseUrl}/widget/image?url=${encodeURIComponent(url)}`,
+          ),
         }));
 
       return { reviews: filtered };
@@ -187,8 +213,9 @@ router.get('/:id/data', async (req, res) => {
       _quotaExceeded: quotaExceeded,
     };
 
-    // Only cache non-quota-exceeded responses
-    if (!quotaExceeded) {
+    // Only cache non-quota-exceeded responses with actual content
+    const hasContent = !data || (data as any).reviews === undefined || (data as any).reviews?.length > 0;
+    if (!quotaExceeded && hasContent) {
       cache.set(cacheKey, result);
     }
 

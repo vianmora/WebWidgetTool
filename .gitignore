@@ -19,3 +19,7 @@ apps/backend/prisma/migrations/*.db
 .vscode/
 .idea/
 *.swp
+
+# Claude
+.claude
+CLAUDE_HISTORIQUE.md

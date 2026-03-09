@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth';
-import { searchPlaces, fetchGoogleReviews } from '../lib/google';
+import { searchPlaces, fetchGoogleReviewsWithPhotos } from '../lib/google';
 
 const router = Router();
 
@@ -10,6 +10,10 @@ router.get('/search', async (req, res) => {
   const q = req.query.q as string;
   if (!q || q.trim().length < 2) {
     res.status(400).json({ error: 'Paramètre q requis (min 2 caractères).' });
+    return;
+  }
+  if (!process.env.GOOGLE_MAPS_API_KEY) {
+    res.status(500).json({ error: 'API_KEY_MISSING', message: 'Clé API Google Maps non configurée.' });
     return;
   }
   try {
@@ -32,7 +36,7 @@ router.get('/reviews', async (req, res) => {
     return;
   }
   try {
-    const reviews = await fetchGoogleReviews(placeId, apiKey, 'fr');
+    const reviews = await fetchGoogleReviewsWithPhotos(placeId, apiKey, 'fr');
     res.json(reviews);
   } catch (err: any) {
     res.status(500).json({ error: err.message });

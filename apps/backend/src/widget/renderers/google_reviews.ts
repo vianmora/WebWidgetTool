@@ -7,6 +7,7 @@ interface Review {
   time: number;
   profile_photo_url: string;
   relative_time_description: string;
+  review_photos?: string[];
 }
 
 export function render(container: HTMLElement, widgetConfig: any, data: any): void {
@@ -48,6 +49,10 @@ export function render(container: HTMLElement, widgetConfig: any, data: any): vo
           </div>
           ${renderStars(r.rating)}
           ${r.text ? `<p style="margin:10px 0 0;color:${textColor};font-size:13px;line-height:1.5">${escHtml(r.text)}</p>` : ''}
+          ${r.review_photos && r.review_photos.length > 0 ? `
+          <div style="display:flex;gap:6px;margin-top:10px;overflow-x:auto;padding-bottom:4px;scrollbar-width:thin">
+            ${r.review_photos.map(url => `<img src="${url}" alt="" style="width:80px;height:80px;object-fit:cover;border-radius:6px;flex-shrink:0">`).join('')}
+          </div>` : ''}
         </div>`;
     }
     html += '</div>';

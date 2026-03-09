@@ -42,8 +42,10 @@ export interface GoogleReview {
   time: number;
   profile_photo_url: string;
   relative_time_description: string;
+  review_photos?: string[]; // populated by Playwright scraper, empty with Places API
 }
 
+// Legacy Places API — no review photos
 export async function fetchGoogleReviews(
   placeId: string,
   apiKey: string,
@@ -65,5 +67,38 @@ export async function fetchGoogleReviews(
     throw new Error(`Google Places API error: ${response.data.status}`);
   }
 
-  return response.data.result?.reviews || [];
+  return (response.data.result?.reviews || []).map((r: any) => ({ ...r, review_photos: [] }));
+}
+
+// New Places API (v1) — includes photos attached to individual reviews.
+// Falls back to legacy API on error (e.g. API not enabled for the key).
+export async function fetchGoogleReviewsWithPhotos(
+  placeId: string,
+  apiKey: string,
+  language = 'fr'
+): Promise<GoogleReview[]> {
+  try {
+    const response = await axios.get(
+      `https://places.googleapis.com/v1/places/${placeId}`,
+      {
+        headers: {
+          'X-Goog-Api-Key': apiKey,
+          'X-Goog-FieldMask': 'reviews',
+        },
+        params: { languageCode: language },
+      }
+    );
+
+    return (response.data.reviews || []).map((r: any) => ({
+      author_name: r.authorAttribution?.displayName || '',
+      rating: r.rating || 0,
+      text: r.text?.text || '',
+      time: r.publishTime ? new Date(r.publishTime).getTime() / 1000 : 0,
+      profile_photo_url: r.authorAttribution?.photoUri || '',
+      relative_time_description: r.relativePublishTimeDescription || '',
+    }));
+  } catch {
+    // New API unavailable or not enabled — fall back gracefully
+    return fetchGoogleReviews(placeId, apiKey, language);
+  }
 }

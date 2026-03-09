@@ -62,7 +62,8 @@ async function initWidget(container: HTMLElement): Promise<void> {
   try {
     const res = await fetch(`${API_BASE}/widget/${widgetId}/data`);
     if (!res.ok) {
-      container.innerHTML = `<div style="color:#9ca3af;font-size:12px;padding:8px">Widget introuvable.</div>`;
+      const msg = res.status >= 500 ? 'Erreur de chargement du widget.' : 'Widget introuvable.';
+      container.innerHTML = `<div style="color:#9ca3af;font-size:12px;padding:8px">${msg}</div>`;
       return;
     }
 

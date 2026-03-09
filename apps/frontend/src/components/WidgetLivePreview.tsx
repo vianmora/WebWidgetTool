@@ -67,6 +67,7 @@ export default function WidgetLivePreview({ type, config }: { type: string; conf
               ? `${apiBase}/widget/image?url=${encodeURIComponent(r.profile_photo_url)}`
               : '',
             ago: r.relative_time_description || '',
+            reviewPhotos: (r.review_photos || []) as string[],
           }));
         setLiveReviews(filtered.length > 0 ? filtered : null);
       })
@@ -95,7 +96,7 @@ export default function WidgetLivePreview({ type, config }: { type: string; conf
     const isReviews = type === 'google_reviews';
 
     // Use real reviews if available, otherwise mock data
-    type ReviewItem = { name: string; rating: number; text: string; photoUrl?: string; ago?: string };
+    type ReviewItem = { name: string; rating: number; text: string; photoUrl?: string; ago?: string; reviewPhotos?: string[] };
     const displayReviews: ReviewItem[] = isReviews && liveReviews
       ? liveReviews
       : MOCK_REVIEWS.map(r => ({ ...r, photoUrl: '' }));
@@ -113,6 +114,13 @@ export default function WidgetLivePreview({ type, config }: { type: string; conf
               <Stars rating={r.rating} color={accent} />
               {r.ago && <div style={{ fontSize: 11, color: textSub }}>{r.ago}</div>}
               <div style={{ fontSize: 12, color: textSub, marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.text}</div>
+              {r.reviewPhotos && r.reviewPhotos.length > 0 && (
+                <div style={{ display: 'flex', gap: 4, marginTop: 6, overflowX: 'auto' }}>
+                  {r.reviewPhotos.map((url, i) => (
+                    <img key={i} src={url} alt="" style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: 5, flexShrink: 0 }} />
+                  ))}
+                </div>
+              )}
             </div>
           </>
         ) : (
@@ -125,6 +133,13 @@ export default function WidgetLivePreview({ type, config }: { type: string; conf
             </div>
             <Stars rating={r.rating} color={accent} />
             <div style={{ fontSize: 11, color: textSub, marginTop: 6, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{r.text}</div>
+            {r.reviewPhotos && r.reviewPhotos.length > 0 && (
+              <div style={{ display: 'flex', gap: 4, marginTop: 6, overflowX: 'auto' }}>
+                {r.reviewPhotos.map((url, i) => (
+                  <img key={i} src={url} alt="" style={{ width: 52, height: 52, objectFit: 'cover', borderRadius: 4, flexShrink: 0 }} />
+                ))}
+              </div>
+            )}
           </>
         )}
       </div>
