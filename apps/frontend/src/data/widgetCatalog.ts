@@ -64,7 +64,7 @@ export const WIDGET_CATALOG: WidgetDefinition[] = [
     description: 'Affichez des témoignages clients saisis manuellement.',
     category: 'Avis & Témoignages',
     icon: '💬',
-    status: 'available',
+    status: 'soon',
     defaultConfig: { items: [], layout: 'grid', theme: 'light', accentColor: '#621B7A' },
     templates: [
       { id: 'grid-light', label: 'Grille claire', config: { layout: 'grid', theme: 'light' } },
@@ -84,7 +84,7 @@ export const WIDGET_CATALOG: WidgetDefinition[] = [
     description: 'Affichez votre note globale en un coup d\'œil.',
     category: 'Avis & Témoignages',
     icon: '🏅',
-    status: 'available',
+    status: 'soon',
     defaultConfig: { source: 'google', rating: 4.8, reviewCount: 120, sourceUrl: '', shape: 'pill', theme: 'light', accentColor: '#621B7A' },
     templates: [
       { id: 'pill-light', label: 'Pilule claire', config: { shape: 'pill', theme: 'light' } },
@@ -106,7 +106,7 @@ export const WIDGET_CATALOG: WidgetDefinition[] = [
     description: 'Bouton de contact WhatsApp flottant sur votre site.',
     category: 'Boutons sociaux',
     icon: '💚',
-    status: 'available',
+    status: 'soon',
     defaultConfig: { phone: '', message: 'Bonjour, je vous contacte depuis votre site web.', position: 'bottom-right', label: '', size: 56 },
     templates: [
       { id: 'right', label: 'Flottant droite', config: { position: 'bottom-right' } },
@@ -125,7 +125,7 @@ export const WIDGET_CATALOG: WidgetDefinition[] = [
     description: 'Bouton de contact Telegram flottant.',
     category: 'Boutons sociaux',
     icon: '✈️',
-    status: 'available',
+    status: 'soon',
     defaultConfig: { username: '', label: '', position: 'bottom-right', size: 56 },
     templates: [
       { id: 'right', label: 'Flottant droite', config: { position: 'bottom-right' } },
@@ -143,7 +143,7 @@ export const WIDGET_CATALOG: WidgetDefinition[] = [
     description: 'Liens vers vos profils, en icônes stylisées.',
     category: 'Boutons sociaux',
     icon: '🔗',
-    status: 'available',
+    status: 'soon',
     defaultConfig: { links: [], size: 32, color: 'brand', layout: 'row' },
     templates: [
       { id: 'row', label: 'Rangée colorée', config: { layout: 'row', color: 'brand' } },
@@ -161,7 +161,7 @@ export const WIDGET_CATALOG: WidgetDefinition[] = [
     description: 'Permettez à vos visiteurs de partager votre contenu.',
     category: 'Boutons sociaux',
     icon: '📤',
-    status: 'available',
+    status: 'soon',
     defaultConfig: { networks: ['facebook', 'x', 'linkedin', 'whatsapp', 'copy'], position: 'inline', orientation: 'horizontal' },
     fields: [
       { key: 'position', label: 'Position', type: 'select', options: [{ value: 'inline', label: 'Intégré' }, { value: 'floating', label: 'Flottant' }] },
@@ -175,7 +175,7 @@ export const WIDGET_CATALOG: WidgetDefinition[] = [
     description: 'Logos clients / partenaires en défilement automatique.',
     category: 'Médias & Contenu',
     icon: '🖼️',
-    status: 'available',
+    status: 'soon',
     defaultConfig: { logos: [], speed: 30, pauseOnHover: true, height: 60 },
     fields: [
       { key: 'speed', label: 'Vitesse (secondes/boucle)', type: 'number', min: 5, max: 120 },
@@ -189,7 +189,7 @@ export const WIDGET_CATALOG: WidgetDefinition[] = [
     description: 'Galerie photo avec lightbox, grille ou carrousel.',
     category: 'Médias & Contenu',
     icon: '📷',
-    status: 'available',
+    status: 'soon',
     defaultConfig: { images: [], layout: 'grid', columns: 3, lightbox: true },
     templates: [
       { id: 'grid', label: 'Grille', config: { layout: 'grid' } },
@@ -207,7 +207,7 @@ export const WIDGET_CATALOG: WidgetDefinition[] = [
     description: 'Intégrez un document PDF directement sur votre page.',
     category: 'Médias & Contenu',
     icon: '📄',
-    status: 'available',
+    status: 'soon',
     defaultConfig: { pdfUrl: '', height: 600, showToolbar: true },
     fields: [
       { key: 'pdfUrl', label: 'URL du PDF', type: 'url', required: true },
@@ -222,7 +222,7 @@ export const WIDGET_CATALOG: WidgetDefinition[] = [
     description: 'Créez de l\'urgence avec un timer jusqu\'à une date.',
     category: 'Conversion & Engagement',
     icon: '⏱️',
-    status: 'available',
+    status: 'soon',
     defaultConfig: { targetDate: '', expiredMessage: 'Événement terminé', theme: 'light', accentColor: '#621B7A' },
     templates: [
       { id: 'light', label: 'Clair', config: { theme: 'light' } },
@@ -241,7 +241,7 @@ export const WIDGET_CATALOG: WidgetDefinition[] = [
     description: 'Bandeau de consentement RGPD personnalisable.',
     category: 'Conversion & Engagement',
     icon: '🍪',
-    status: 'available',
+    status: 'soon',
     defaultConfig: { message: 'Nous utilisons des cookies pour améliorer votre expérience.', acceptLabel: 'Accepter', rejectLabel: 'Refuser', position: 'bottom', privacyUrl: '', accentColor: '#621B7A' },
     fields: [
       { key: 'message', label: 'Message', type: 'textarea' },
@@ -258,7 +258,7 @@ export const WIDGET_CATALOG: WidgetDefinition[] = [
     description: 'Bouton flottant pour remonter en haut de page.',
     category: 'Conversion & Engagement',
     icon: '⬆️',
-    status: 'available',
+    status: 'soon',
     defaultConfig: { threshold: 300, position: 'bottom-right', shape: 'circle', accentColor: '#621B7A' },
     fields: [
       { key: 'threshold', label: 'Apparaît après (px scrollés)', type: 'number', min: 100, max: 1000 },
@@ -274,7 +274,7 @@ export const WIDGET_CATALOG: WidgetDefinition[] = [
     description: 'Affichez vos horaires avec statut ouvert/fermé en temps réel.',
     category: 'Informations pratiques',
     icon: '🕐',
-    status: 'available',
+    status: 'soon',
     defaultConfig: { timezone: 'Europe/Paris', hours: [], openLabel: 'Ouvert', closedLabel: 'Fermé', theme: 'light', accentColor: '#621B7A' },
     templates: [
       { id: 'light', label: 'Clair', config: { theme: 'light' } },
@@ -294,7 +294,7 @@ export const WIDGET_CATALOG: WidgetDefinition[] = [
     description: 'Intégrez une carte Google Maps avec votre localisation.',
     category: 'Informations pratiques',
     icon: '📍',
-    status: 'available',
+    status: 'soon',
     defaultConfig: { address: '', placeId: '', zoom: 15, height: 400, showMarker: true },
     fields: [
       { key: 'address', label: 'Adresse (ou Place ID ci-dessous)', type: 'text', placeholder: '10 rue de la Paix, Paris' },
@@ -309,7 +309,7 @@ export const WIDGET_CATALOG: WidgetDefinition[] = [
     description: 'Questions/Réponses en accordéon interactif.',
     category: 'Informations pratiques',
     icon: '❓',
-    status: 'available',
+    status: 'soon',
     defaultConfig: { items: [], allowMultiple: false, defaultOpen: -1, theme: 'light', accentColor: '#621B7A' },
     templates: [
       { id: 'light', label: 'Clair', config: { theme: 'light' } },
@@ -327,7 +327,7 @@ export const WIDGET_CATALOG: WidgetDefinition[] = [
     description: 'Comparez vos offres avec un tableau de pricing.',
     category: 'Informations pratiques',
     icon: '💰',
-    status: 'available',
+    status: 'soon',
     defaultConfig: { plans: [], currency: '€', theme: 'light', accentColor: '#621B7A' },
     templates: [
       { id: 'light', label: 'Clair', config: { theme: 'light' } },
@@ -345,7 +345,7 @@ export const WIDGET_CATALOG: WidgetDefinition[] = [
     description: 'Présentez votre équipe avec photos et réseaux sociaux.',
     category: 'Informations pratiques',
     icon: '👥',
-    status: 'available',
+    status: 'soon',
     defaultConfig: { members: [], layout: 'grid', columns: 3, theme: 'light', accentColor: '#621B7A' },
     templates: [
       { id: 'grid', label: 'Grille', config: { layout: 'grid', theme: 'light' } },
