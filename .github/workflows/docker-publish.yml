@@ -4,26 +4,31 @@ on:
   push:
     branches:
       - main
+    tags:
+      - 'v*.*'
   workflow_dispatch:
 
 jobs:
   check-and-push:
     runs-on: ubuntu-latest
     steps:
-      - name: Check last Docker Hub push date
+      - name: Check if push needed
         id: check
         run: |
+          # Tag pushes and manual triggers always push
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || \
+             [ "${{ github.ref_type }}" = "tag" ]; then
+            echo "Manual trigger or tag push, always pushing"
+            echo "should_push=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Branch pushes: skip if latest was pushed less than 24h ago
           USERNAME="${{ secrets.DOCKERHUB_USERNAME }}"
           REPO="web-widget-tool"
 
           RESPONSE=$(curl -s "https://hub.docker.com/v2/repositories/${USERNAME}/${REPO}/tags/latest")
           LAST_UPDATED=$(echo "$RESPONSE" | jq -r '.last_updated // empty')
-
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "Manual trigger, skipping date check"
-            echo "should_push=true" >> $GITHUB_OUTPUT
-            exit 0
-          fi
 
           if [ -z "$LAST_UPDATED" ]; then
             echo "No existing image, will push"
@@ -61,6 +66,17 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Compute Docker tags
+        id: tags
+        if: steps.check.outputs.should_push == 'true'
+        run: |
+          BASE="${{ secrets.DOCKERHUB_USERNAME }}/web-widget-tool"
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            echo "tags=${BASE}:${{ github.ref_name }},${BASE}:latest" >> $GITHUB_OUTPUT
+          else
+            echo "tags=${BASE}:latest" >> $GITHUB_OUTPUT
+          fi
+
       - name: Build and push
         if: steps.check.outputs.should_push == 'true'
         uses: docker/build-push-action@v5
@@ -69,4 +85,4 @@ jobs:
           file: Dockerfile
           push: true
           platforms: linux/amd64,linux/arm64
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/web-widget-tool:latest
+          tags: ${{ steps.tags.outputs.tags }}
