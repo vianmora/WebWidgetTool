@@ -45,18 +45,24 @@ export interface GoogleReview {
   review_photos?: string[]; // populated by Apify scraper, empty with Places API
 }
 
+export interface PlaceReviewsResult {
+  reviews: GoogleReview[];
+  averageRating?: number;
+  totalReviews?: number;
+}
+
 // Legacy Places API — no review photos
 export async function fetchGoogleReviews(
   placeId: string,
   apiKey: string,
   language = 'fr'
-): Promise<GoogleReview[]> {
+): Promise<PlaceReviewsResult> {
   const response = await axios.get(
     'https://maps.googleapis.com/maps/api/place/details/json',
     {
       params: {
         place_id: placeId,
-        fields: 'name,rating,reviews',
+        fields: 'name,rating,user_ratings_total,reviews',
         key: apiKey,
         language,
       },
@@ -67,7 +73,12 @@ export async function fetchGoogleReviews(
     throw new Error(`Google Places API error: ${response.data.status}`);
   }
 
-  return (response.data.result?.reviews || []).map((r: any) => ({ ...r, review_photos: [] }));
+  const result = response.data.result || {};
+  return {
+    reviews: (result.reviews || []).map((r: any) => ({ ...r, review_photos: [] })),
+    averageRating: result.rating,
+    totalReviews: result.user_ratings_total,
+  };
 }
 
 // New Places API (v1) — includes photos attached to individual reviews.
@@ -76,27 +87,32 @@ export async function fetchGoogleReviewsWithPhotos(
   placeId: string,
   apiKey: string,
   language = 'fr'
-): Promise<GoogleReview[]> {
+): Promise<PlaceReviewsResult> {
   try {
     const response = await axios.get(
       `https://places.googleapis.com/v1/places/${placeId}`,
       {
         headers: {
           'X-Goog-Api-Key': apiKey,
-          'X-Goog-FieldMask': 'reviews',
+          'X-Goog-FieldMask': 'rating,userRatingCount,reviews',
         },
         params: { languageCode: language },
       }
     );
 
-    return (response.data.reviews || []).map((r: any) => ({
-      author_name: r.authorAttribution?.displayName || '',
-      rating: r.rating || 0,
-      text: r.text?.text || '',
-      time: r.publishTime ? new Date(r.publishTime).getTime() / 1000 : 0,
-      profile_photo_url: r.authorAttribution?.photoUri || '',
-      relative_time_description: r.relativePublishTimeDescription || '',
-    }));
+    return {
+      reviews: (response.data.reviews || []).map((r: any) => ({
+        author_name: r.authorAttribution?.displayName || '',
+        rating: r.rating || 0,
+        text: r.text?.text || '',
+        time: r.publishTime ? new Date(r.publishTime).getTime() / 1000 : 0,
+        profile_photo_url: r.authorAttribution?.photoUri || '',
+        relative_time_description: r.relativePublishTimeDescription || '',
+        review_photos: [],
+      })),
+      averageRating: response.data.rating,
+      totalReviews: response.data.userRatingCount,
+    };
   } catch {
     // New API unavailable or not enabled — fall back gracefully
     return fetchGoogleReviews(placeId, apiKey, language);

@@ -2,11 +2,19 @@ import React, { useEffect, useState } from 'react';
 import api from '../lib/api';
 
 // ── Mock data ──────────────────────────────────────────────────────────────────
+function svgPhoto(bg: string, emoji: string): string {
+  return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><rect width="80" height="80" fill="${bg}"/><text x="40" y="52" font-size="30" text-anchor="middle">${emoji}</text></svg>`)}`;
+}
+
 const MOCK_REVIEWS = [
-  { name: 'Alice M.', rating: 5, text: 'Excellent service, je recommande vraiment cet établissement à tout le monde.' },
-  { name: 'Jean-Paul B.', rating: 5, text: 'Très professionnel, équipe sympathique et résultats vraiment au rendez-vous.' },
-  { name: 'Sophie K.', rating: 5, text: 'Je suis très satisfaite de la qualité du service, je reviendrai.' },
-  { name: 'Marc L.', rating: 4, text: 'Bonne expérience globale, quelques petits points à améliorer mais globalement top.' },
+  { name: 'Alice M.', rating: 5, icon: '👩', text: 'Excellent service, je recommande vraiment cet établissement à tout le monde. L\'équipe est aux petits soins et le résultat est impeccable.', reviewPhotos: [svgPhoto('#dbeafe', '🏪'), svgPhoto('#dcfce7', '🌿')] },
+  { name: 'Jean-Paul B.', rating: 5, icon: '👨‍💼', text: 'Top.' },
+  { name: 'Sophie K.', rating: 5, icon: '👩‍🦰', text: 'Je suis très satisfaite de la qualité du service, je reviendrai sans hésiter. Les délais sont respectés et la communication est excellente.', reviewPhotos: [svgPhoto('#fef9c3', '✨')] },
+  { name: 'Marc L.', rating: 4, icon: '🧔', text: 'Bonne expérience globale, quelques petits points à améliorer mais globalement très positif.' },
+  { name: 'Camille D.', rating: 5, icon: '👩‍🎨', text: 'Incroyable ! Je n\'aurais pas pu espérer mieux. Je recommande les yeux fermés à tous mes proches.', reviewPhotos: [svgPhoto('#fce7f3', '🎨'), svgPhoto('#ede9fe', '💜'), svgPhoto('#dbeafe', '🖼️')] },
+  { name: 'Thomas R.', rating: 4, icon: '👨‍🔧', text: 'Rapport qualité-prix imbattable.' },
+  { name: 'Léa F.', rating: 5, icon: '👩‍💻', text: 'Prise en charge rapide, personnel attentionné. Un vrai plaisir du début à la fin. Merci !', reviewPhotos: [svgPhoto('#dcfce7', '🌸')] },
+  { name: 'Nicolas V.', rating: 5, icon: '🧑‍🏫', text: 'Très bonne prestation. Équipe professionnelle et à l\'écoute. Je reviendrai certainement et n\'hésiterai pas à en parler autour de moi.' },
 ];
 
 const MOCK_TEAM = [
@@ -43,23 +51,27 @@ function Stars({ rating, color }: { rating: number; color: string }) {
 export default function WidgetLivePreview({ type, config }: { type: string; config: Record<string, any> }) {
   // Fetch real Google Reviews when placeId is set
   const [liveReviews, setLiveReviews] = useState<typeof MOCK_REVIEWS | null>(null);
+  const [liveStats, setLiveStats] = useState<{ averageRating?: number; totalReviews?: number } | null>(null);
   const [loadingReviews, setLoadingReviews] = useState(false);
   const apiBase = import.meta.env.VITE_API_URL || '';
 
   useEffect(() => {
     if (type !== 'google_reviews' || !config.placeId) {
       setLiveReviews(null);
+      setLiveStats(null);
       return;
     }
     setLoadingReviews(true);
     api.get('/api/places/reviews', { params: { placeId: config.placeId } })
       .then(({ data }) => {
+        const result = data as { reviews: any[]; averageRating?: number; totalReviews?: number };
+        setLiveStats({ averageRating: result.averageRating, totalReviews: result.totalReviews });
         const minRating = Number(config.minRating ?? 1);
         const maxReviews = Number(config.maxReviews ?? 5);
-        const filtered = (data as any[])
-          .filter(r => r.rating >= minRating)
+        const filtered = (result.reviews || [])
+          .filter((r: any) => r.rating >= minRating)
           .slice(0, maxReviews)
-          .map(r => ({
+          .map((r: any) => ({
             name: r.author_name,
             rating: r.rating,
             text: r.text || '',
@@ -71,7 +83,7 @@ export default function WidgetLivePreview({ type, config }: { type: string; conf
           }));
         setLiveReviews(filtered.length > 0 ? filtered : null);
       })
-      .catch(() => setLiveReviews(null))
+      .catch(() => { setLiveReviews(null); setLiveStats(null); })
       .finally(() => setLoadingReviews(false));
   }, [type, config.placeId, config.minRating, config.maxReviews]);
 
@@ -95,71 +107,152 @@ export default function WidgetLivePreview({ type, config }: { type: string; conf
   if (type === 'google_reviews' || type === 'testimonials') {
     const isReviews = type === 'google_reviews';
 
-    // Use real reviews if available, otherwise mock data
-    type ReviewItem = { name: string; rating: number; text: string; photoUrl?: string; ago?: string; reviewPhotos?: string[] };
+    type ReviewItem = { name: string; rating: number; text: string; photoUrl?: string; icon?: string; ago?: string; reviewPhotos?: string[] };
     const displayReviews: ReviewItem[] = isReviews && liveReviews
       ? liveReviews
       : MOCK_REVIEWS.map(r => ({ ...r, photoUrl: '' }));
-    const cards = displayReviews.slice(0, layout === 'grid' ? 4 : 3);
+    const cards = displayReviews;
 
-    const ReviewCard = ({ r }: { r: ReviewItem }) => (
-      <div style={{ background: cardBg, borderRadius: 8, padding: layout === 'grid' ? 12 : 14, border: `1px solid ${border}`, ...(layout === 'list' ? { display: 'flex', gap: 12 } : {}) }}>
-        {layout === 'list' ? (
-          <>
-            {r.photoUrl
-              ? <img src={r.photoUrl} alt={r.name} style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
-              : <Avatar name={r.name} size={36} />}
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontWeight: 600, fontSize: 13 }}>{r.name}</div>
-              <Stars rating={r.rating} color={accent} />
-              {r.ago && <div style={{ fontSize: 11, color: textSub }}>{r.ago}</div>}
-              <div style={{ fontSize: 12, color: textSub, marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.text}</div>
-              {r.reviewPhotos && r.reviewPhotos.length > 0 && (
-                <div style={{ display: 'flex', gap: 4, marginTop: 6, overflowX: 'auto' }}>
-                  {r.reviewPhotos.map((url, i) => (
-                    <img key={i} src={url} alt="" style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: 5, flexShrink: 0 }} />
-                  ))}
-                </div>
-              )}
-            </div>
-          </>
-        ) : (
-          <>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-              {r.photoUrl
-                ? <img src={r.photoUrl} alt={r.name} style={{ width: 26, height: 26, borderRadius: '50%', objectFit: 'cover' }} />
-                : <Avatar name={r.name} size={26} />}
-              <div style={{ fontWeight: 600, fontSize: 12 }}>{r.name}</div>
-            </div>
-            <Stars rating={r.rating} color={accent} />
-            <div style={{ fontSize: 11, color: textSub, marginTop: 6, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{r.text}</div>
-            {r.reviewPhotos && r.reviewPhotos.length > 0 && (
-              <div style={{ display: 'flex', gap: 4, marginTop: 6, overflowX: 'auto' }}>
-                {r.reviewPhotos.map((url, i) => (
-                  <img key={i} src={url} alt="" style={{ width: 52, height: 52, objectFit: 'cover', borderRadius: 4, flexShrink: 0 }} />
-                ))}
-              </div>
-            )}
-          </>
+    const ReviewCard = ({ r, compact }: { r: ReviewItem; compact?: boolean }) => (
+      <div style={{ background: cardBg, borderRadius: 8, padding: compact ? 12 : 14, border: `1px solid ${border}` }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: compact ? 8 : 10, marginBottom: compact ? 6 : 10 }}>
+          {r.photoUrl
+            ? <img src={r.photoUrl} alt={r.name} style={{ width: compact ? 28 : 36, height: compact ? 28 : 36, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+            : r.icon
+              ? <div style={{ width: compact ? 28 : 36, height: compact ? 28 : 36, borderRadius: '50%', background: '#e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: compact ? 14 : 18, flexShrink: 0 }}>{r.icon}</div>
+              : <Avatar name={r.name} size={compact ? 28 : 36} />}
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontWeight: 600, fontSize: compact ? 12 : 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</div>
+            {r.ago && <div style={{ fontSize: 11, color: textSub }}>{r.ago}</div>}
+          </div>
+        </div>
+        <Stars rating={r.rating} color={accent} />
+        <div style={{ fontSize: compact ? 11 : 12, color: textSub, marginTop: 6, lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{r.text}</div>
+        {r.reviewPhotos && r.reviewPhotos.length > 0 && (
+          <div style={{ display: 'flex', gap: 6, marginTop: 8, overflowX: 'auto' }}>
+            {r.reviewPhotos.map((url, i) => (
+              <img key={i} src={url} alt="" style={{ width: compact ? 52 : 64, height: compact ? 52 : 64, borderRadius: 6, objectFit: 'cover', flexShrink: 0 }} />
+            ))}
+          </div>
         )}
       </div>
     );
 
+    const placeId = config.placeId as string | undefined;
+    const reviewUrl = placeId
+      ? `https://search.google.com/local/writereview?placeid=${encodeURIComponent(placeId)}`
+      : '#';
+
+    // Use real place-level stats if loaded, fallback to mock values
+    const avgRating: number = liveStats?.averageRating ?? 4.8;
+    const totalCount: number = liveStats?.totalReviews ?? 142;
+    const roundedAvg = Math.round(avgRating);
+
+    const GoogleLogo = () => (
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 48 48" style={{ flexShrink: 0 }}>
+        <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.08 17.74 9.5 24 9.5z"/>
+        <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+        <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+        <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.35-8.16 2.35-6.26 0-11.57-3.59-13.46-8.83l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+      </svg>
+    );
+
+    const Header = () => (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, paddingBottom: 14, borderBottom: `1px solid ${border}` }}>
+        <GoogleLogo />
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' as const }}>
+          <span style={{ color: '#f59e0b', fontSize: 13, letterSpacing: 1 }}>{'★'.repeat(roundedAvg)}{'☆'.repeat(5 - roundedAvg)}</span>
+          <span style={{ fontWeight: 700, fontSize: 14, color: textPrimary }}>{avgRating.toFixed(1)}</span>
+          {loadingReviews
+            ? <span style={{ fontSize: 12, color: textSub }}>Chargement…</span>
+            : <span style={{ fontSize: 12, color: textSub }}>{totalCount.toLocaleString('fr-FR')} avis</span>}
+        </div>
+        <a href={reviewUrl} target="_blank" rel="noopener noreferrer"
+          style={{ display: 'inline-block', padding: '7px 12px', background: accent, color: '#fff', borderRadius: 6, fontSize: 12, fontWeight: 600, textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0 }}>
+          Nous laisser un avis
+        </a>
+      </div>
+    );
+
+    // ── Carousel ──────────────────────────────────────────────────────────────
+    if (layout === 'carousel') {
+      const [carouselIdx, setCarouselIdx] = React.useState(0);
+      const total = cards.length;
+      return (
+        <div style={wrap}>
+          <Header />
+          <div style={{ position: 'relative' }}>
+            <div style={{ overflow: 'hidden', borderRadius: 8 }}>
+              <div style={{ display: 'flex', transition: 'transform .35s ease', transform: `translateX(-${carouselIdx * 100}%)` }}>
+                {cards.map((r, i) => (
+                  <div key={i} style={{ minWidth: '100%', boxSizing: 'border-box' }}>
+                    <ReviewCard r={r} />
+                  </div>
+                ))}
+              </div>
+            </div>
+            <button onClick={() => setCarouselIdx(i => (i - 1 + total) % total)}
+              style={{ position: 'absolute', left: -14, top: '50%', transform: 'translateY(-50%)', width: 28, height: 28, borderRadius: '50%', border: `1px solid ${border}`, background: bg, cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 3px rgba(0,0,0,.1)' }}>←</button>
+            <button onClick={() => setCarouselIdx(i => (i + 1) % total)}
+              style={{ position: 'absolute', right: -14, top: '50%', transform: 'translateY(-50%)', width: 28, height: 28, borderRadius: '50%', border: `1px solid ${border}`, background: bg, cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 3px rgba(0,0,0,.1)' }}>→</button>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginTop: 14 }}>
+            {cards.map((_, i) => (
+              <button key={i} onClick={() => setCarouselIdx(i)}
+                style={{ width: 8, height: 8, borderRadius: '50%', border: 'none', padding: 0, cursor: 'pointer', background: i === carouselIdx ? accent : border, transition: 'background .2s' }} />
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    // ── Masonry ───────────────────────────────────────────────────────────────
+    if (layout === 'masonry') {
+      const INITIAL = 4;
+      const [showAll, setShowAll] = React.useState(false);
+      const visible = showAll ? cards : cards.slice(0, INITIAL);
+      const hasMore = cards.length > INITIAL;
+      return (
+        <div style={wrap}>
+          <Header />
+          <div style={{ columnCount: 3, columnGap: 10 }}>
+            {visible.map((r, i) => (
+              <div key={i} style={{ breakInside: 'avoid', marginBottom: 10, display: 'inline-block', width: '100%' }}>
+                <ReviewCard r={r} compact />
+              </div>
+            ))}
+          </div>
+          {hasMore && !showAll && (
+            <div style={{ textAlign: 'center', marginTop: 10 }}>
+              <button onClick={() => setShowAll(true)}
+                style={{ background: accent, color: '#fff', border: 'none', borderRadius: 6, padding: '7px 22px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                Voir plus
+              </button>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // ── Horizontal scroll (list) & Vertical scroll (grid) ────────────────────
     return (
       <div style={wrap}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, paddingBottom: 14, borderBottom: `1px solid ${border}` }}>
-          <div style={{ width: 32, height: 32, background: accent, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>⭐</div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 700, fontSize: 15 }}>{isReviews ? 'Google Reviews' : 'Témoignages'}</div>
-            <div style={{ fontSize: 12, color: textSub }}>
-              {isReviews && liveReviews ? `${liveReviews.length} avis chargés` : '4.8 ★ · aperçu'}
-            </div>
+        <Header />
+        {layout === 'list' ? (
+          // Horizontal scroll: single row
+          <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 6 }}>
+            {cards.map((r, i) => (
+              <div key={i} style={{ flex: '0 0 240px' }}>
+                <ReviewCard r={r} compact />
+              </div>
+            ))}
           </div>
-          {isReviews && loadingReviews && <div style={{ fontSize: 11, color: textSub }}>Chargement...</div>}
-        </div>
-        <div style={layout === 'grid' ? { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 } : { display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {cards.map((r, i) => <ReviewCard key={i} r={r} />)}
-        </div>
+        ) : (
+          // Vertical scroll (grid): column with max height
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 340, overflowY: 'auto', paddingRight: 4 }}>
+            {cards.map((r, i) => <ReviewCard key={i} r={r} />)}
+          </div>
+        )}
       </div>
     );
   }

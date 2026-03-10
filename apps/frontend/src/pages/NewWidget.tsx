@@ -707,7 +707,7 @@ export default function NewWidget() {
   const PageShell = ({ children }: { children: React.ReactNode }) => (
     <div className="py-8 px-4">
       {/* Breadcrumb + step indicator */}
-      <div className="max-w-4xl mx-auto mb-5 flex items-center justify-between">
+      <div className="max-w-6xl mx-auto mb-5 flex items-center justify-between">
         <nav className="flex items-center gap-1.5 text-sm">
           <button
             onClick={() => { setStep('catalog'); setSelectedType(null); }}
@@ -726,7 +726,7 @@ export default function NewWidget() {
       </div>
 
       {/* Main frame */}
-      <div className="max-w-4xl mx-auto bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+      <div className="max-w-6xl mx-auto bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
         {/* Widget identity strip */}
         <div className="px-6 pt-5 pb-4 border-b border-gray-100 flex items-center gap-3">
           {def?.image
@@ -750,44 +750,63 @@ export default function NewWidget() {
 
   // ── Step 2: Template picker ────────────────────────────────────────────────
   if (step === 'template') {
+    const getTemplateConfig = (template: typeof templates[0]) => ({
+      ...def?.defaultConfig,
+      accentColor: '#621B7A',
+      ...template.config,
+    });
+
     return (
       <PageShell>
         <div className="p-6">
           <h2 className="text-sm font-semibold text-brand-text mb-1">Choisissez un template</h2>
-          <p className="text-xs text-gray-400 mb-6">Sélectionnez le style qui correspond le mieux à votre site</p>
+          <p className="text-xs text-gray-400 mb-6">Sélectionnez le style qui correspond le mieux à votre site. Le nombre de carte par ligne ou colonne est paramétrable dans l'étape d'après.</p>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Template grid */}
-            <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-4 gap-6">
+            {/* Template thumbnails — 1/4 */}
+            <div className="col-span-1 flex flex-col gap-3">
               {templates.map((template, idx) => (
                 <button
                   key={template.id}
                   onClick={() => setSelectedTemplateIdx(idx)}
-                  className={`p-2 rounded-xl border-2 transition-all text-left ${
+                  className={`rounded-xl border-2 transition-all text-left overflow-hidden w-full ${
                     selectedTemplateIdx === idx
-                      ? 'border-primary bg-primary/5 shadow-sm'
-                      : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                      ? 'border-primary shadow-sm'
+                      : 'border-gray-200 hover:border-gray-300'
                   }`}
                 >
-                  <TemplateThumbnail type={selectedType!} templateId={template.id} className="w-full h-auto rounded-lg" />
-                  <p className={`text-xs mt-2 text-center leading-tight font-medium ${selectedTemplateIdx === idx ? 'text-primary' : 'text-gray-500'}`}>
+                  {/* Scaled-down live preview */}
+                  <div className="relative overflow-hidden" style={{ height: 100 }}>
+                    <div style={{
+                      position: 'absolute', top: 0, left: 0,
+                      width: 'calc(100% / 0.44)',
+                      transform: 'scale(0.44)',
+                      transformOrigin: 'top left',
+                      pointerEvents: 'none',
+                    }}>
+                      <WidgetLivePreview type={selectedType!} config={getTemplateConfig(template)} />
+                    </div>
+                  </div>
+                  <p className={`text-xs py-1.5 text-center font-medium border-t ${
+                    selectedTemplateIdx === idx ? 'text-primary border-primary/20 bg-primary/5' : 'text-gray-500 border-gray-100'
+                  }`}>
                     {template.label}
                   </p>
                 </button>
               ))}
             </div>
 
-            {/* Large preview */}
-            <div className="flex flex-col items-center justify-center bg-gray-50 rounded-xl p-6 border border-gray-100">
-              <p className="text-xs text-gray-400 uppercase tracking-widest mb-4 font-semibold">Aperçu</p>
-              <TemplateThumbnail
-                type={selectedType!}
-                templateId={templates[selectedTemplateIdx]?.id ?? 'default'}
-                className="w-full h-auto rounded-xl shadow-md border border-gray-200"
-              />
-              <p className="text-sm font-semibold text-brand-text mt-3">
-                {templates[selectedTemplateIdx]?.label}
+            {/* Large live preview — 3/4 */}
+            <div className="col-span-3 bg-gray-50 rounded-xl border border-gray-100 overflow-hidden flex flex-col">
+              <p className="text-xs text-gray-400 uppercase tracking-widest font-semibold px-4 pt-4 pb-3 border-b border-gray-100">
+                Aperçu — {templates[selectedTemplateIdx]?.label}
               </p>
+              <div className="p-4 flex-1">
+                <WidgetLivePreview
+                  type={selectedType!}
+                  config={getTemplateConfig(templates[selectedTemplateIdx])}
+                />
+              </div>
             </div>
           </div>
 

@@ -69,32 +69,32 @@ async function getWidgetData(widgetId: string, req: any) {
       const maxReviews: number = Number(config.maxReviews ?? 5);
       const baseUrl = `${req.protocol}://${req.get('host')}`;
 
-      let rawReviews: Awaited<ReturnType<typeof fetchGoogleReviewsWithPhotos>>;
+      let rawResult: Awaited<ReturnType<typeof fetchGoogleReviewsWithPhotos>>;
 
       // Cache the raw reviews independently of the widget config (theme, layout, etc.)
       const rawCacheKey = `apify:${config.placeId}:${maxReviews}:${language}`;
-      const cachedRaw = cache.get<typeof rawReviews>(rawCacheKey);
+      const cachedRaw = cache.get<typeof rawResult>(rawCacheKey);
 
       if (cachedRaw) {
-        rawReviews = cachedRaw;
+        rawResult = cachedRaw;
       } else if (process.env.APIFY_TOKEN) {
         try {
-          rawReviews = await fetchReviewsViaApify(config.placeId, maxReviews, language);
+          rawResult = await fetchReviewsViaApify(config.placeId, maxReviews, language);
         } catch (apifyErr) {
           console.error('[apify] failed, falling back to Places API:', apifyErr);
           const apiKey = process.env.GOOGLE_MAPS_API_KEY || config.apiKey;
-          rawReviews = apiKey
+          rawResult = apiKey
             ? await fetchGoogleReviewsWithPhotos(config.placeId, apiKey, language)
-            : [];
+            : { reviews: [] };
         }
-        cache.set(rawCacheKey, rawReviews);
+        cache.set(rawCacheKey, rawResult);
       } else {
         const apiKey = process.env.GOOGLE_MAPS_API_KEY || config.apiKey;
-        rawReviews = await fetchGoogleReviewsWithPhotos(config.placeId, apiKey, language);
-        cache.set(rawCacheKey, rawReviews);
+        rawResult = await fetchGoogleReviewsWithPhotos(config.placeId, apiKey, language);
+        cache.set(rawCacheKey, rawResult);
       }
 
-      const filtered = rawReviews
+      const filtered = rawResult.reviews
         .filter((r) => r.rating >= minRating)
         .slice(0, maxReviews)
         .map((r) => ({
@@ -111,10 +111,14 @@ async function getWidgetData(widgetId: string, req: any) {
         const r0 = filtered[0] as any;
         console.log('[reviews] first review — profile_photo_url:', r0.profile_photo_url?.slice(0, 80));
         console.log('[reviews] first review — review_photos count:', (r0.review_photos || []).length);
-        console.log('[reviews] total after filter:', filtered.length, '/ raw:', rawReviews.length);
+        console.log('[reviews] total after filter:', filtered.length, '/ raw:', rawResult.reviews.length);
       }
 
-      return { reviews: filtered };
+      return {
+        reviews: filtered,
+        averageRating: rawResult.averageRating,
+        totalReviews: rawResult.totalReviews,
+      };
     }
 
     // Static/config-only widgets — data comes from config itself

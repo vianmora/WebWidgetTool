@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { GoogleReview } from './google';
+import { GoogleReview, PlaceReviewsResult } from './google';
 
 const APIFY_BASE = 'https://api.apify.com/v2';
 const ACTOR_ID = 'compass~google-maps-reviews-scraper';
@@ -12,7 +12,7 @@ export async function fetchReviewsViaApify(
   placeId: string,
   maxReviews: number,
   language: string,
-): Promise<GoogleReview[]> {
+): Promise<PlaceReviewsResult> {
   const token = process.env.APIFY_TOKEN;
   if (!token) throw new Error('APIFY_TOKEN not configured');
 
@@ -45,7 +45,14 @@ export async function fetchReviewsViaApify(
     console.log('[apify] first item sample:', JSON.stringify(items[0], null, 2).slice(0, 800));
   }
 
-  return items.map((item) => ({
+  // Place-level fields are on the first item (totalScore, reviewsCount)
+  const first = items[0] || {};
+  const averageRating: number | undefined =
+    typeof first.totalScore === 'number' ? first.totalScore : undefined;
+  const totalReviews: number | undefined =
+    typeof first.reviewsCount === 'number' ? first.reviewsCount : undefined;
+
+  const reviews: GoogleReview[] = items.map((item) => ({
     author_name: item.name || '',
     rating: typeof item.stars === 'number' ? item.stars : 0,
     text: item.text || '',
@@ -56,4 +63,6 @@ export async function fetchReviewsViaApify(
     relative_time_description: item.publishAt || '',
     review_photos: Array.isArray(item.reviewImageUrls) ? item.reviewImageUrls : [],
   }));
+
+  return { reviews, averageRating, totalReviews };
 }
