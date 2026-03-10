@@ -10,6 +10,7 @@ import placesRouter from './routes/places';
 import publicRouter from './routes/public';
 import billingRouter from './routes/billing';
 import adminRouter from './routes/admin';
+import docsFeedbackRouter from './routes/docsFeedback';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -54,6 +55,9 @@ app.use('/api/widgets', dashboardCors, widgetsRouter);
 app.use('/api/places', dashboardCors, placesRouter);
 app.use('/api/billing', dashboardCors, billingRouter);
 app.use('/api/admin', dashboardCors, adminRouter);
+
+// ─── Docs feedback (open CORS — called from static docs site) ────────────────
+app.use('/api/docs-feedback', openCors, docsFeedbackRouter);
 
 // ─── Public widget routes (open CORS) ────────────────────────────────────────
 app.use('/widget', openCors, publicRouter);
