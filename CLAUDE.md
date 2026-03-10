@@ -123,6 +123,6 @@ Migrations live in `apps/backend/prisma/migrations/`. Run `prisma migrate deploy
 
 ## Versioning
 
-- Version actuelle : **v0.2.16**
+- Version actuelle : **v0.3.0**
 - Format : `vMajeur.mineur.fix`
-- Tags git sur `main` uniquement (ex: `git tag v0.2.17 && git push origin v0.2.17`)
+- Tags git sur `main` uniquement (ex: `git tag v0.3.1 && git push origin v0.3.1`)
