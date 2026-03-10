@@ -80,6 +80,10 @@ model Widget {
   userId String?
   user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
 
+  // Apify dataset/schedule IDs (null if Apify not configured or non-google_reviews widget)
+  apifyDatasetId  String?
+  apifyScheduleId String?
+
   views WidgetView[]
 }
 

@@ -4,6 +4,7 @@ import prisma from '../lib/prisma';
 import cache from '../lib/cache';
 import { isSaaS } from '../lib/mode';
 import { hasReachedWidgetLimit, getPlanLimits } from '../lib/planLimits';
+import { createScheduleAndRun, deleteSchedule } from '../lib/apify';
 
 const router = Router();
 
@@ -50,6 +51,23 @@ router.post('/', async (req: AuthRequest, res) => {
         ...(isSaaS() ? { userId: req.user!.id } : {}),
       },
     });
+
+    // If Apify is configured and this is a google_reviews widget, create a
+    // dataset + schedule and store the IDs. Fire-and-forget: don't block the response.
+    if (process.env.APIFY_TOKEN && type === 'google_reviews' && (config as any).placeId) {
+      const cfg = config as any;
+      const language: string = cfg.language || 'fr';
+      const maxReviews: number = Number(cfg.maxReviews ?? 5);
+      createScheduleAndRun(cfg.placeId, language, maxReviews)
+        .then(({ datasetId, scheduleId }) =>
+          (prisma.widget.update as any)({
+            where: { id: widget.id },
+            data: { apifyDatasetId: datasetId, apifyScheduleId: scheduleId },
+          }),
+        )
+        .catch((err) => console.error('[apify] createScheduleAndRun failed:', err?.message));
+    }
+
     res.status(201).json(widget);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -141,13 +159,22 @@ router.patch('/:id', async (req: AuthRequest, res) => {
 
 router.delete('/:id', async (req: AuthRequest, res) => {
   try {
-    // Ownership check in SaaS mode
-    if (isSaaS()) {
-      const existing = await prisma.widget.findUnique({ where: { id: req.params.id } });
-      if (!existing || existing.userId !== req.user!.id) {
-        res.status(403).json({ error: 'Forbidden' });
-        return;
-      }
+    const existing = await prisma.widget.findUnique({ where: { id: req.params.id } });
+    if (!existing) {
+      res.status(404).json({ error: 'Widget introuvable.' });
+      return;
+    }
+    if (isSaaS() && existing.userId !== req.user!.id) {
+      res.status(403).json({ error: 'Forbidden' });
+      return;
+    }
+
+    // Clean up Apify schedule before deleting (fire-and-forget)
+    const scheduleId = (existing as any).apifyScheduleId as string | null;
+    if (scheduleId) {
+      deleteSchedule(scheduleId).catch((err) =>
+        console.error('[apify] deleteSchedule failed:', err?.message),
+      );
     }
 
     await prisma.widget.delete({ where: { id: req.params.id } });

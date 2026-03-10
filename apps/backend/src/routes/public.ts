@@ -3,7 +3,7 @@ import axios from 'axios';
 import prisma from '../lib/prisma';
 import cache from '../lib/cache';
 import { fetchGoogleReviewsWithPhotos } from '../lib/google';
-import { fetchReviewsViaApify } from '../lib/apify';
+import { fetchReviewsViaApify, fetchDatasetItems } from '../lib/apify';
 import { isSaaS } from '../lib/mode';
 import { hasReachedViewLimit } from '../lib/planLimits';
 
@@ -77,21 +77,35 @@ async function getWidgetData(widgetId: string, req: any) {
 
       if (cachedRaw) {
         rawResult = cachedRaw;
-      } else if (process.env.APIFY_TOKEN) {
-        try {
-          rawResult = await fetchReviewsViaApify(config.placeId, maxReviews, language);
-        } catch (apifyErr) {
-          console.error('[apify] failed, falling back to Places API:', apifyErr);
+      } else {
+        // Priority 1: named Apify dataset (pre-scraped, < 1s)
+        const apifyDatasetId = (widget as any).apifyDatasetId as string | null;
+        if (apifyDatasetId) {
+          const datasetResult = await fetchDatasetItems(apifyDatasetId);
+          if (datasetResult) {
+            rawResult = datasetResult;
+            cache.set(rawCacheKey, rawResult);
+          }
+        }
+
+        // Priority 2: run-sync Apify (30-60s, only if no dataset yet)
+        if (!rawResult! && process.env.APIFY_TOKEN) {
+          try {
+            rawResult = await fetchReviewsViaApify(config.placeId, maxReviews, language);
+          } catch (apifyErr) {
+            console.error('[apify] failed, falling back to Places API:', apifyErr);
+          }
+          if (rawResult!) cache.set(rawCacheKey, rawResult);
+        }
+
+        // Priority 3: Google Places API fallback
+        if (!rawResult!) {
           const apiKey = process.env.GOOGLE_MAPS_API_KEY || config.apiKey;
           rawResult = apiKey
             ? await fetchGoogleReviewsWithPhotos(config.placeId, apiKey, language)
             : { reviews: [] };
+          cache.set(rawCacheKey, rawResult);
         }
-        cache.set(rawCacheKey, rawResult);
-      } else {
-        const apiKey = process.env.GOOGLE_MAPS_API_KEY || config.apiKey;
-        rawResult = await fetchGoogleReviewsWithPhotos(config.placeId, apiKey, language);
-        cache.set(rawCacheKey, rawResult);
       }
 
       const filtered = rawResult.reviews
