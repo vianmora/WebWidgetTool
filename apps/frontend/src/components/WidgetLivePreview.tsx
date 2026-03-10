@@ -74,6 +74,7 @@ export default function WidgetLivePreview({ type, config }: { type: string; conf
           .map((r: any) => ({
             name: r.author_name,
             rating: r.rating,
+            icon: '',
             text: r.text || '',
             photoUrl: r.profile_photo_url
               ? `${apiBase}/widget/image?url=${encodeURIComponent(r.profile_photo_url)}`
